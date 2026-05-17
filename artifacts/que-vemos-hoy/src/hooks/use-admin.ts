@@ -102,17 +102,26 @@ export function useSyncFromTmdb() {
   const syncUpcoming = useMutation({
     mutationFn: async () => {
       const existingIds = await getExistingIds();
-      const [page1, page2] = await Promise.all([
-        fetch("https://api.themoviedb.org/3/movie/upcoming?language=en-US&page=1", { headers: TMDB_HEADERS }).then(r => r.json()),
-        fetch("https://api.themoviedb.org/3/movie/upcoming?language=en-US&page=2", { headers: TMDB_HEADERS }).then(r => r.json())
+
+      // Fecha de hoy en formato YYYY-MM-DD
+      const today = new Date().toISOString().split("T")[0];
+
+      const [page1, page2, page3] = await Promise.all([
+        fetch("https://api.themoviedb.org/3/movie/upcoming?language=en-US&page=1&region=US", { headers: TMDB_HEADERS }).then(r => r.json()),
+        fetch("https://api.themoviedb.org/3/movie/upcoming?language=en-US&page=2&region=US", { headers: TMDB_HEADERS }).then(r => r.json()),
+        fetch("https://api.themoviedb.org/3/movie/upcoming?language=en-US&page=3&region=US", { headers: TMDB_HEADERS }).then(r => r.json()),
       ]);
 
-      const all = [...(page1.results || []), ...(page2.results || [])];
+      const all = [...(page1.results || []), ...(page2.results || []), ...(page3.results || [])];
+
       const items = all
         .filter((item: any) =>
           !existingIds.has(item.id) &&
-          item.poster_path
+          item.poster_path &&
+          item.release_date &&
+          item.release_date > today  // solo fechas futuras
         )
+        .sort((a: any, b: any) => a.release_date.localeCompare(b.release_date)) // más próximos primero
         .slice(0, 20)
         .map((item: any) => ({ ...tmdbToContent(item, "upcoming"), media_type: "movie" as const }));
 

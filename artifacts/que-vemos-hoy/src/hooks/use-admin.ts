@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { ContentRow, NoteRow, ContentSection } from "@/lib/database.types";
@@ -6,30 +5,133 @@ import { useToast } from "@/hooks/use-toast";
 
 const TMDB_TOKEN = import.meta.env.VITE_TMDB_BEARER_TOKEN;
 
+const TMDB_HEADERS = {
+  Authorization: `Bearer ${TMDB_TOKEN}`,
+  accept: "application/json"
+};
+
+function filterTmdb(item: any) {
+  if (item.media_type !== "movie" && item.media_type !== "tv") return false;
+  if (item.media_type === "tv" && item.origin_country?.includes("IN")) return false;
+  if (item.media_type === "movie" && item.production_countries?.some((c: any) => c.iso_3166_1 === "IN")) return false;
+  return true;
+}
+
+function tmdbToContent(item: any, section: ContentSection): Omit<ContentRow, "id" | "created_at" | "updated_at"> {
+  return {
+    tmdb_id: item.id,
+    media_type: item.media_type ?? "movie",
+    section,
+    title: item.title || item.name,
+    original_title: item.original_title || item.original_name || null,
+    overview: item.overview || null,
+    poster_path: item.poster_path || null,
+    backdrop_path: item.backdrop_path || null,
+    release_date: item.release_date || item.first_air_date || null,
+    rating: item.vote_average ?? null,
+    vote_count: item.vote_count ?? null,
+    platforms: [],
+    personal_review: null,
+    visible: true,
+    display_order: 0
+  };
+}
+
+// ── Search ────────────────────────────────────────────────────────────────────
+
 export function useTmdbSearch(query: string) {
   return useQuery({
     queryKey: ["tmdb", query],
     queryFn: async () => {
       if (!query || query.length < 3) return [];
-      const res = await fetch(`https://api.themoviedb.org/3/search/multi?query=${encodeURIComponent(query)}&language=en-US`, {
-        headers: {
-          Authorization: `Bearer ${TMDB_TOKEN}`,
-          accept: "application/json"
-        }
-      });
+      const res = await fetch(
+        `https://api.themoviedb.org/3/search/multi?query=${encodeURIComponent(query)}&language=en-US`,
+        { headers: TMDB_HEADERS }
+      );
       if (!res.ok) throw new Error("TMDB Search failed");
       const data = await res.json();
-      
-      return (data.results || []).filter((item: any) => {
-        if (item.media_type !== "movie" && item.media_type !== "tv") return false;
-        if (item.media_type === "tv" && item.origin_country?.includes("IN")) return false;
-        if (item.media_type === "movie" && item.production_countries?.some((c: any) => c.iso_3166_1 === "IN")) return false;
-        return true;
-      });
+      return (data.results || []).filter(filterTmdb);
     },
     enabled: query.length >= 3 && !!TMDB_TOKEN
   });
 }
+
+// ── Sync from TMDB ────────────────────────────────────────────────────────────
+
+export function useSyncFromTmdb() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  async function getExistingIds(): Promise<Set<number>> {
+    const { data } = await supabase.from("content").select("tmdb_id");
+    return new Set((data || []).map(c => c.tmdb_id));
+  }
+
+  const syncTrending = useMutation({
+    mutationFn: async () => {
+      const existingIds = await getExistingIds();
+      const res = await fetch(
+        "https://api.themoviedb.org/3/trending/all/week?language=en-US",
+        { headers: TMDB_HEADERS }
+      );
+      if (!res.ok) throw new Error("TMDB trending failed");
+      const data = await res.json();
+
+      const items = (data.results || [])
+        .filter((item: any) =>
+          filterTmdb(item) &&
+          !existingIds.has(item.id) &&
+          (item.vote_count ?? 0) >= 50 &&
+          (item.vote_average ?? 0) >= 6
+        )
+        .slice(0, 12)
+        .map((item: any) => tmdbToContent(item, "weekly"));
+
+      if (items.length === 0) return 0;
+      const { error } = await supabase.from("content").insert(items);
+      if (error) throw error;
+      return items.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ["content"] });
+      toast({ title: `${count} títulos agregados a "Lo mejor esta semana"` });
+    },
+    onError: (e: Error) => toast({ title: "Error sync trending", description: e.message, variant: "destructive" })
+  });
+
+  const syncUpcoming = useMutation({
+    mutationFn: async () => {
+      const existingIds = await getExistingIds();
+      const [page1, page2] = await Promise.all([
+        fetch("https://api.themoviedb.org/3/movie/upcoming?language=en-US&page=1", { headers: TMDB_HEADERS }).then(r => r.json()),
+        fetch("https://api.themoviedb.org/3/movie/upcoming?language=en-US&page=2", { headers: TMDB_HEADERS }).then(r => r.json())
+      ]);
+
+      const all = [...(page1.results || []), ...(page2.results || [])];
+      const items = all
+        .filter((item: any) =>
+          !existingIds.has(item.id) &&
+          item.poster_path
+        )
+        .slice(0, 20)
+        .map((item: any) => ({ ...tmdbToContent(item, "upcoming"), media_type: "movie" as const }));
+
+      if (items.length === 0) return 0;
+      const { error } = await supabase.from("content").insert(items);
+      if (error) throw error;
+      return items.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ["content"] });
+      toast({ title: `${count} estrenos agregados a "Próximos estrenos"` });
+    },
+    onError: (e: Error) => toast({ title: "Error sync upcoming", description: e.message, variant: "destructive" })
+  });
+
+  return { syncTrending, syncUpcoming };
+}
+
+// ── Content mutations ─────────────────────────────────────────────────────────
 
 export function useMutateContent() {
   const queryClient = useQueryClient();
@@ -45,11 +147,11 @@ export function useMutateContent() {
       queryClient.invalidateQueries({ queryKey: ["content"] });
       toast({ title: "Contenido agregado" });
     },
-    onError: (e) => toast({ title: "Error", description: e.message, variant: "destructive" })
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" })
   });
 
   const updateContent = useMutation({
-    mutationFn: async ({ id, updates }: { id: string, updates: Partial<ContentRow> }) => {
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<ContentRow> }) => {
       const { data, error } = await supabase.from("content").update(updates).eq("id", id).select().single();
       if (error) throw error;
       return data;
@@ -58,7 +160,7 @@ export function useMutateContent() {
       queryClient.invalidateQueries({ queryKey: ["content"] });
       toast({ title: "Contenido actualizado" });
     },
-    onError: (e) => toast({ title: "Error", description: e.message, variant: "destructive" })
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" })
   });
 
   const deleteContent = useMutation({
@@ -68,13 +170,15 @@ export function useMutateContent() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["content"] });
-      toast({ title: "Contenido eliminado" });
+      toast({ title: "Eliminado" });
     },
-    onError: (e) => toast({ title: "Error", description: e.message, variant: "destructive" })
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" })
   });
 
   return { addContent, updateContent, deleteContent };
 }
+
+// ── Notes mutations ───────────────────────────────────────────────────────────
 
 export function useMutateNotes() {
   const queryClient = useQueryClient();
@@ -88,13 +192,13 @@ export function useMutateNotes() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notes"] });
-      toast({ title: "Nota agregada" });
+      toast({ title: "Nota publicada" });
     },
-    onError: (e) => toast({ title: "Error", description: e.message, variant: "destructive" })
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" })
   });
 
   const updateNote = useMutation({
-    mutationFn: async ({ id, updates }: { id: string, updates: Partial<NoteRow> }) => {
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<NoteRow> }) => {
       const { data, error } = await supabase.from("notes").update(updates).eq("id", id).select().single();
       if (error) throw error;
       return data;
@@ -103,7 +207,7 @@ export function useMutateNotes() {
       queryClient.invalidateQueries({ queryKey: ["notes"] });
       toast({ title: "Nota actualizada" });
     },
-    onError: (e) => toast({ title: "Error", description: e.message, variant: "destructive" })
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" })
   });
 
   const deleteNote = useMutation({
@@ -115,7 +219,7 @@ export function useMutateNotes() {
       queryClient.invalidateQueries({ queryKey: ["notes"] });
       toast({ title: "Nota eliminada" });
     },
-    onError: (e) => toast({ title: "Error", description: e.message, variant: "destructive" })
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" })
   });
 
   return { addNote, updateNote, deleteNote };

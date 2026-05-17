@@ -3,12 +3,11 @@ import { PhoneLayout } from "@/components/layout/PhoneLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { useAllContent, useNotes } from "@/hooks/use-data";
-import { useMutateContent, useTmdbSearch, useMutateNotes } from "@/hooks/use-admin";
-import { Trash, LogOut, Plus, Search, ChevronDown, ChevronUp, Image } from "lucide-react";
+import { useMutateContent, useTmdbSearch, useMutateNotes, useSyncFromTmdb } from "@/hooks/use-admin";
+import { Trash, LogOut, Plus, Search, RefreshCw, ImageIcon } from "lucide-react";
 
 export default function Admin() {
   const { session, isLoading } = useAuth();
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
@@ -20,20 +19,24 @@ export default function Admin() {
     if (error) setLoginError(error.message);
   };
 
-  if (isLoading) return <PhoneLayout><div className="flex-1 flex items-center justify-center">Cargando...</div></PhoneLayout>;
+  if (isLoading) {
+    return (
+      <PhoneLayout>
+        <div className="flex-1 flex items-center justify-center text-muted-foreground">Cargando...</div>
+      </PhoneLayout>
+    );
+  }
 
   if (!session) {
     return (
       <PhoneLayout>
-        <div className="flex-1 flex flex-col items-center justify-center p-6 gap-8 relative">
+        <div className="flex-1 flex flex-col items-center justify-center p-6 gap-8">
           <div className="text-center">
             <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">Qué Vemos Hoy</h1>
             <p className="text-muted-foreground text-sm uppercase tracking-widest">Admin</p>
           </div>
-
           <form onSubmit={handleLogin} className="w-full flex flex-col gap-4">
             {loginError && <div className="text-destructive text-sm text-center">{loginError}</div>}
-
             <input
               type="email"
               placeholder="Email"
@@ -62,17 +65,21 @@ export default function Admin() {
   return (
     <PhoneLayout>
       <div className="flex flex-col h-full bg-background">
-        <header className="p-4 pt-12 border-b border-border flex justify-between items-center bg-card">
+        {/* Header admin */}
+        <div className="bg-card border-b border-border px-4 pt-10 pb-4 flex justify-between items-end">
           <div>
-            <h1 className="font-bold text-lg text-white">Admin</h1>
-            <p className="text-xs text-muted-foreground uppercase tracking-widest">Qué Vemos Hoy</p>
+            <p className="text-[10px] text-primary uppercase tracking-widest font-bold">Qué Vemos Hoy</p>
+            <h1 className="text-xl font-bold text-white mt-0.5">Panel de Admin</h1>
           </div>
-          <button onClick={() => supabase.auth.signOut()} className="p-2 text-muted-foreground hover:text-white">
-            <LogOut size={20} />
+          <button
+            onClick={() => supabase.auth.signOut()}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-white pb-1"
+          >
+            <LogOut size={14} /> Salir
           </button>
-        </header>
+        </div>
 
-        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-8 no-scrollbar">
+        <div className="flex-1 overflow-y-auto no-scrollbar">
           <AdminContent />
         </div>
       </div>
@@ -80,13 +87,30 @@ export default function Admin() {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="text-[10px] font-bold uppercase tracking-widest text-primary mb-3">{children}</h2>
+  );
+}
+
+function Card({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="bg-card border border-border rounded-xl p-4">{children}</div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 function AdminContent() {
   const { data: content } = useAllContent();
   const { data: notes } = useNotes(true);
   const { deleteContent, addContent } = useMutateContent();
   const { addNote, deleteNote } = useMutateNotes();
+  const { syncTrending, syncUpcoming } = useSyncFromTmdb();
 
-  // ── Película / serie ──────────────────────────────────────────────
+  // ── Manual add state ──
   const [searchQuery, setSearchQuery] = useState("");
   const { data: searchResults, isLoading: isSearching } = useTmdbSearch(searchQuery);
   const [selectedSection, setSelectedSection] = useState("weekly");
@@ -107,26 +131,23 @@ function AdminContent() {
       tmdb_id: pendingItem.id,
       media_type: pendingItem.media_type,
       section: selectedSection as any,
-      title: pendingItem.title || pendingItem.name || pendingItem.original_title || pendingItem.original_name,
+      title: pendingItem.title || pendingItem.name,
       original_title: pendingItem.original_title || pendingItem.original_name || null,
-      overview: pendingItem.overview,
-      poster_path: pendingItem.poster_path,
-      backdrop_path: pendingItem.backdrop_path,
-      release_date: pendingItem.release_date || pendingItem.first_air_date,
-      rating: pendingItem.vote_average,
-      vote_count: pendingItem.vote_count,
-      platforms: pendingPlatforms ? pendingPlatforms.split(",").map(p => p.trim()).filter(Boolean) : [],
+      overview: pendingItem.overview || null,
+      poster_path: pendingItem.poster_path || null,
+      backdrop_path: pendingItem.backdrop_path || null,
+      release_date: pendingItem.release_date || pendingItem.first_air_date || null,
+      rating: pendingItem.vote_average ?? null,
+      vote_count: pendingItem.vote_count ?? null,
+      platforms: pendingPlatforms ? pendingPlatforms.split(",").map((p: string) => p.trim()).filter(Boolean) : [],
       personal_review: pendingReview.trim() || null,
       visible: true,
       display_order: 0
     });
     setPendingItem(null);
-    setPendingReview("");
-    setPendingPlatforms("");
   };
 
-  // ── Nota ──────────────────────────────────────────────────────────
-  const [noteOpen, setNoteOpen] = useState(false);
+  // ── Note form state ──
   const [noteTitle, setNoteTitle] = useState("");
   const [noteBody, setNoteBody] = useState("");
   const [noteExcerpt, setNoteExcerpt] = useState("");
@@ -136,192 +157,225 @@ function AdminContent() {
   const handleAddNote = (e: React.FormEvent) => {
     e.preventDefault();
     if (!noteTitle.trim() || !noteBody.trim()) return;
-    addNote.mutate({
-      title: noteTitle.trim(),
-      body: noteBody.trim(),
-      excerpt: noteExcerpt.trim() || null,
-      image_url: noteImageUrl.trim() || null,
-      visible: noteVisible,
-      display_order: 0
-    }, {
-      onSuccess: () => {
-        setNoteTitle("");
-        setNoteBody("");
-        setNoteExcerpt("");
-        setNoteImageUrl("");
-        setNoteVisible(true);
-        setNoteOpen(false);
+    addNote.mutate(
+      {
+        title: noteTitle.trim(),
+        body: noteBody.trim(),
+        excerpt: noteExcerpt.trim() || null,
+        image_url: noteImageUrl.trim() || null,
+        visible: noteVisible,
+        display_order: 0
+      },
+      {
+        onSuccess: () => {
+          setNoteTitle(""); setNoteBody(""); setNoteExcerpt("");
+          setNoteImageUrl(""); setNoteVisible(true);
+        }
       }
-    });
+    );
   };
 
+  // Section counts for display
+  const weeklyCount = content?.filter(c => c.section === "weekly").length ?? 0;
+  const upcomingCount = content?.filter(c => c.section === "upcoming").length ?? 0;
+
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6 p-4 pb-12">
 
-      {/* ── AGREGAR PELÍCULA / SERIE ─────────────────────────────── */}
-      <section className="bg-card p-4 rounded-lg border border-border">
-        <h2 className="text-sm font-bold uppercase tracking-widest text-primary mb-4">Agregar Película o Serie</h2>
+      {/* ── 1. SYNC AUTOMÁTICO ───────────────────────────────────── */}
+      <section>
+        <SectionLabel>Actualizar desde TMDB</SectionLabel>
+        <Card>
+          <p className="text-xs text-muted-foreground mb-4 leading-relaxed">
+            Trae automáticamente lo que está de moda esta semana y los próximos estrenos. Después borrás los que no querés mostrar.
+          </p>
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-white">Lo mejor esta semana</p>
+                <p className="text-xs text-muted-foreground">{weeklyCount} títulos guardados</p>
+              </div>
+              <button
+                onClick={() => syncTrending.mutate()}
+                disabled={syncTrending.isPending}
+                className="flex items-center gap-1.5 bg-primary/20 text-primary text-xs font-bold px-3 py-2 rounded-lg hover:bg-primary hover:text-primary-foreground disabled:opacity-50 transition-colors"
+              >
+                <RefreshCw size={13} className={syncTrending.isPending ? "animate-spin" : ""} />
+                {syncTrending.isPending ? "Sincronizando..." : "Sincronizar"}
+              </button>
+            </div>
 
-        <div className="flex gap-2 mb-4">
+            <div className="border-t border-border" />
+
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-white">Próximos estrenos</p>
+                <p className="text-xs text-muted-foreground">{upcomingCount} estrenos guardados</p>
+              </div>
+              <button
+                onClick={() => syncUpcoming.mutate()}
+                disabled={syncUpcoming.isPending}
+                className="flex items-center gap-1.5 bg-primary/20 text-primary text-xs font-bold px-3 py-2 rounded-lg hover:bg-primary hover:text-primary-foreground disabled:opacity-50 transition-colors"
+              >
+                <RefreshCw size={13} className={syncUpcoming.isPending ? "animate-spin" : ""} />
+                {syncUpcoming.isPending ? "Sincronizando..." : "Sincronizar"}
+              </button>
+            </div>
+          </div>
+        </Card>
+      </section>
+
+      {/* ── 2. AGREGAR MANUAL ────────────────────────────────────── */}
+      <section>
+        <SectionLabel>Agregar película o serie</SectionLabel>
+        <Card>
+          {/* Sección destino */}
           <select
             value={selectedSection}
             onChange={e => setSelectedSection(e.target.value)}
-            className="bg-background border border-border rounded px-2 py-2 text-sm focus:outline-none flex-1"
+            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary mb-3"
           >
-            <option value="hero">Hero</option>
-            <option value="weekly">Lo Mejor Esta Semana</option>
+            <option value="hero">Hero (destacado principal)</option>
+            <option value="weekly">Lo mejor esta semana</option>
             <option value="classic">Imperdibles</option>
-            <option value="upcoming">Próximos Estrenos</option>
+            <option value="upcoming">Próximos estrenos</option>
           </select>
-        </div>
 
-        {/* Mini-form para reseña antes de guardar */}
-        {pendingItem && (
-          <div className="mb-4 p-3 bg-background border border-primary/50 rounded-lg flex flex-col gap-3">
-            <div className="flex gap-3 items-center">
-              <div
-                className="w-10 h-14 bg-muted rounded bg-cover flex-shrink-0"
-                style={{ backgroundImage: pendingItem.poster_path ? `url(https://image.tmdb.org/t/p/w200${pendingItem.poster_path})` : 'none' }}
+          {/* Mini-form de reseña antes de confirmar */}
+          {pendingItem && (
+            <div className="mb-3 p-3 bg-background border border-primary/50 rounded-lg flex flex-col gap-3">
+              <div className="flex gap-3 items-center">
+                <div
+                  className="w-10 h-14 bg-muted rounded bg-cover flex-shrink-0"
+                  style={{ backgroundImage: pendingItem.poster_path ? `url(https://image.tmdb.org/t/p/w200${pendingItem.poster_path})` : "none" }}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-white truncate">{pendingItem.title || pendingItem.name}</p>
+                  <p className="text-xs text-muted-foreground capitalize">
+                    {pendingItem.media_type} · {(pendingItem.release_date || pendingItem.first_air_date || "").substring(0, 4)}
+                  </p>
+                </div>
+              </div>
+              <textarea
+                placeholder="Tu reseña o comentario personal (opcional)..."
+                value={pendingReview}
+                onChange={e => setPendingReview(e.target.value)}
+                rows={3}
+                className="w-full bg-card border border-border rounded-lg p-2 focus:outline-none focus:border-primary text-sm text-white resize-none"
               />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold truncate text-white">
-                  {pendingItem.title || pendingItem.name}
-                </p>
-                <p className="text-xs text-muted-foreground capitalize">
-                  {pendingItem.media_type} · {(pendingItem.release_date || pendingItem.first_air_date || "").substring(0, 4)}
-                </p>
+              <input
+                type="text"
+                placeholder="Plataforma (ej: Netflix, HBO, Disney+)"
+                value={pendingPlatforms}
+                onChange={e => setPendingPlatforms(e.target.value)}
+                className="w-full bg-card border border-border rounded-lg p-2 focus:outline-none focus:border-primary text-sm"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={handleConfirmAdd}
+                  className="flex-1 bg-primary text-primary-foreground font-bold py-2 rounded-lg text-sm hover:opacity-90"
+                >
+                  Guardar
+                </button>
+                <button
+                  onClick={() => setPendingItem(null)}
+                  className="px-4 py-2 border border-border rounded-lg text-sm text-muted-foreground hover:text-white"
+                >
+                  Cancelar
+                </button>
               </div>
             </div>
-            <textarea
-              placeholder="Tu reseña o comentario personal (opcional)..."
-              value={pendingReview}
-              onChange={e => setPendingReview(e.target.value)}
-              rows={3}
-              className="w-full bg-card border border-border rounded p-2 focus:outline-none focus:border-primary text-sm text-white resize-none"
-            />
+          )}
+
+          {/* Buscador */}
+          <div className="relative mb-3">
+            <Search size={15} className="absolute left-3 top-2.5 text-muted-foreground" />
             <input
               type="text"
-              placeholder="Plataforma (ej: Netflix, HBO, Disney+)"
-              value={pendingPlatforms}
-              onChange={e => setPendingPlatforms(e.target.value)}
-              className="w-full bg-card border border-border rounded p-2 focus:outline-none focus:border-primary text-sm"
+              placeholder="Buscar película o serie..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full bg-background border border-border rounded-lg p-2 pl-9 focus:outline-none focus:border-primary text-sm"
             />
-            <div className="flex gap-2">
-              <button
-                onClick={handleConfirmAdd}
-                className="flex-1 bg-primary text-primary-foreground font-bold py-2 rounded-md text-sm hover:opacity-90"
-              >
-                Guardar
-              </button>
-              <button
-                onClick={() => setPendingItem(null)}
-                className="px-4 py-2 border border-border rounded-md text-sm text-muted-foreground hover:text-white"
-              >
-                Cancelar
-              </button>
-            </div>
           </div>
-        )}
 
-        <div className="relative mb-4">
-          <Search size={16} className="absolute left-3 top-3 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Buscar película o serie..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="w-full bg-background border border-border rounded p-2 pl-9 focus:outline-none focus:border-primary text-sm"
-          />
-        </div>
-
-        {searchQuery.length >= 3 && (
-          <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto no-scrollbar">
-            {isSearching ? (
-              <div className="text-xs text-center text-muted-foreground p-2">Buscando...</div>
-            ) : searchResults && searchResults.length > 0 ? (
-              searchResults.map((item: any) => (
-                <div key={item.id} className="flex gap-3 p-2 bg-background rounded items-center border border-border">
-                  <div
-                    className="w-10 h-14 bg-muted rounded bg-cover flex-shrink-0"
-                    style={{ backgroundImage: item.poster_path ? `url(https://image.tmdb.org/t/p/w200${item.poster_path})` : 'none' }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold truncate">{item.title || item.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {(item.release_date || item.first_air_date || "").substring(0, 4)} · {item.media_type}
-                    </p>
+          {searchQuery.length >= 3 && (
+            <div className="flex flex-col gap-2 max-h-72 overflow-y-auto no-scrollbar">
+              {isSearching ? (
+                <p className="text-xs text-center text-muted-foreground p-2">Buscando...</p>
+              ) : searchResults && searchResults.length > 0 ? (
+                searchResults.map((item: any) => (
+                  <div key={item.id} className="flex gap-3 p-2 bg-background rounded-lg items-center border border-border">
+                    <div
+                      className="w-9 h-12 bg-muted rounded bg-cover flex-shrink-0"
+                      style={{ backgroundImage: item.poster_path ? `url(https://image.tmdb.org/t/p/w200${item.poster_path})` : "none" }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold truncate text-white">{item.title || item.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {(item.release_date || item.first_air_date || "").substring(0, 4)} · {item.media_type}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleSelectItem(item)}
+                      className="p-2 bg-primary/20 text-primary rounded-lg hover:bg-primary hover:text-primary-foreground"
+                    >
+                      <Plus size={15} />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => handleSelectItem(item)}
-                    className="p-2 bg-primary/20 text-primary rounded-md hover:bg-primary hover:text-primary-foreground"
-                  >
-                    <Plus size={16} />
-                  </button>
-                </div>
-              ))
-            ) : (
-              <div className="text-xs text-center text-muted-foreground p-2">Sin resultados</div>
-            )}
-          </div>
-        )}
+                ))
+              ) : (
+                <p className="text-xs text-center text-muted-foreground p-2">Sin resultados</p>
+              )}
+            </div>
+          )}
+        </Card>
       </section>
 
-      {/* ── AGREGAR NOTA ─────────────────────────────────────────── */}
-      <section className="bg-card p-4 rounded-lg border border-border">
-        <button
-          onClick={() => setNoteOpen(v => !v)}
-          className="w-full flex justify-between items-center"
-        >
-          <h2 className="text-sm font-bold uppercase tracking-widest text-primary">Agregar Nota / Lectura</h2>
-          {noteOpen ? <ChevronUp size={16} className="text-muted-foreground" /> : <ChevronDown size={16} className="text-muted-foreground" />}
-        </button>
-
-        {noteOpen && (
-          <form onSubmit={handleAddNote} className="flex flex-col gap-3 mt-4">
+      {/* ── 3. AGREGAR NOTA ──────────────────────────────────────── */}
+      <section>
+        <SectionLabel>Agregar nota / lectura</SectionLabel>
+        <Card>
+          <form onSubmit={handleAddNote} className="flex flex-col gap-3">
             <input
               type="text"
               placeholder="Título *"
               value={noteTitle}
               onChange={e => setNoteTitle(e.target.value)}
               required
-              className="w-full bg-background border border-border rounded p-2 focus:outline-none focus:border-primary text-sm text-white"
+              className="w-full bg-background border border-border rounded-lg p-2.5 focus:outline-none focus:border-primary text-sm text-white"
             />
-
             <textarea
               placeholder="Texto completo *"
               value={noteBody}
               onChange={e => setNoteBody(e.target.value)}
               required
               rows={5}
-              className="w-full bg-background border border-border rounded p-2 focus:outline-none focus:border-primary text-sm text-white resize-none"
+              className="w-full bg-background border border-border rounded-lg p-2.5 focus:outline-none focus:border-primary text-sm text-white resize-none"
             />
-
             <input
               type="text"
-              placeholder="Resumen corto (se ve en la tarjeta)"
+              placeholder="Resumen corto (aparece en la tarjeta de la home)"
               value={noteExcerpt}
               onChange={e => setNoteExcerpt(e.target.value)}
-              className="w-full bg-background border border-border rounded p-2 focus:outline-none focus:border-primary text-sm"
+              className="w-full bg-background border border-border rounded-lg p-2.5 focus:outline-none focus:border-primary text-sm"
             />
-
             <div className="relative">
-              <Image size={15} className="absolute left-3 top-2.5 text-muted-foreground" />
+              <ImageIcon size={14} className="absolute left-3 top-3 text-muted-foreground" />
               <input
                 type="url"
-                placeholder="URL de imagen (opcional)"
+                placeholder="URL de imagen de portada (opcional)"
                 value={noteImageUrl}
                 onChange={e => setNoteImageUrl(e.target.value)}
-                className="w-full bg-background border border-border rounded p-2 pl-9 focus:outline-none focus:border-primary text-sm"
+                className="w-full bg-background border border-border rounded-lg p-2.5 pl-9 focus:outline-none focus:border-primary text-sm"
               />
             </div>
-
             {noteImageUrl && (
               <div
-                className="w-full h-32 rounded-lg bg-cover bg-center border border-border"
+                className="w-full h-28 rounded-lg bg-cover bg-center border border-border"
                 style={{ backgroundImage: `url(${noteImageUrl})` }}
               />
             )}
-
             <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
               <input
                 type="checkbox"
@@ -331,83 +385,82 @@ function AdminContent() {
               />
               Visible para los visitantes
             </label>
-
             <button
               type="submit"
               disabled={addNote.isPending || !noteTitle.trim() || !noteBody.trim()}
-              className="bg-primary text-primary-foreground font-bold py-2 rounded-md text-sm hover:opacity-90 disabled:opacity-50"
+              className="bg-primary text-primary-foreground font-bold py-2.5 rounded-lg text-sm hover:opacity-90 disabled:opacity-50"
             >
-              {addNote.isPending ? "Guardando..." : "Publicar nota"}
+              {addNote.isPending ? "Publicando..." : "Publicar nota"}
             </button>
           </form>
-        )}
+        </Card>
       </section>
 
-      {/* ── LISTA CONTENIDO ──────────────────────────────────────── */}
+      {/* ── 4. CONTENIDO ACTUAL ──────────────────────────────────── */}
       <section>
-        <h2 className="text-sm font-bold uppercase tracking-widest text-primary mb-4">Contenido Actual</h2>
+        <SectionLabel>Contenido guardado ({content?.length ?? 0})</SectionLabel>
         <div className="flex flex-col gap-2">
-          {content?.map(item => (
-            <div key={item.id} className="flex gap-3 p-3 bg-card rounded-lg border border-border items-center">
+          {content && content.length > 0 ? content.map(item => (
+            <div key={item.id} className="flex gap-3 p-3 bg-card rounded-xl border border-border items-center">
               <div
-                className="w-12 h-16 bg-muted rounded bg-cover flex-shrink-0"
-                style={{ backgroundImage: item.poster_path ? `url(https://image.tmdb.org/t/p/w200${item.poster_path})` : 'none' }}
+                className="w-11 h-14 bg-muted rounded-lg bg-cover flex-shrink-0"
+                style={{ backgroundImage: item.poster_path ? `url(https://image.tmdb.org/t/p/w200${item.poster_path})` : "none" }}
               />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold truncate text-white">{item.title}</p>
-                <p className="text-xs text-muted-foreground flex gap-2">
+                <p className="text-sm font-bold text-white truncate">{item.title}</p>
+                <p className="text-xs text-muted-foreground">
                   <span className="text-primary uppercase tracking-wider">{item.section}</span>
-                  <span>{item.visible ? 'Visible' : 'Oculto'}</span>
+                  {item.platforms && item.platforms.length > 0 && ` · ${item.platforms.join(", ")}`}
                 </p>
                 {item.personal_review && (
-                  <p className="text-xs text-gray-500 italic truncate mt-0.5">"{item.personal_review}"</p>
+                  <p className="text-[11px] text-gray-500 italic truncate mt-0.5">"{item.personal_review}"</p>
                 )}
               </div>
               <button
                 onClick={() => deleteContent.mutate(item.id)}
-                className="p-2 text-destructive hover:bg-destructive/10 rounded-md flex-shrink-0"
+                className="p-2 text-destructive hover:bg-destructive/10 rounded-lg flex-shrink-0"
               >
-                <Trash size={16} />
+                <Trash size={15} />
               </button>
             </div>
-          ))}
-          {(!content || content.length === 0) && (
-            <p className="text-sm text-muted-foreground italic">Sin contenido todavía.</p>
+          )) : (
+            <p className="text-sm text-muted-foreground italic px-1">
+              Sin contenido. Usá "Sincronizar" arriba o agregá uno manualmente.
+            </p>
           )}
         </div>
       </section>
 
-      {/* ── LISTA NOTAS ──────────────────────────────────────────── */}
-      <section className="mb-8">
-        <h2 className="text-sm font-bold uppercase tracking-widest text-primary mb-4">Notas Actuales</h2>
+      {/* ── 5. NOTAS ACTUALES ────────────────────────────────────── */}
+      <section>
+        <SectionLabel>Notas publicadas ({notes?.length ?? 0})</SectionLabel>
         <div className="flex flex-col gap-2">
-          {notes?.map(item => (
-            <div key={item.id} className="flex gap-3 p-3 bg-card rounded-lg border border-border items-center">
+          {notes && notes.length > 0 ? notes.map(item => (
+            <div key={item.id} className="flex gap-3 p-3 bg-card rounded-xl border border-border items-center">
               {item.image_url ? (
                 <div
-                  className="w-12 h-12 bg-muted rounded bg-cover flex-shrink-0"
+                  className="w-11 h-11 bg-muted rounded-lg bg-cover flex-shrink-0"
                   style={{ backgroundImage: `url(${item.image_url})` }}
                 />
               ) : (
-                <div className="w-12 h-12 bg-muted rounded flex items-center justify-center flex-shrink-0">
-                  <Image size={20} className="text-muted-foreground opacity-40" />
+                <div className="w-11 h-11 bg-muted rounded-lg flex items-center justify-center flex-shrink-0">
+                  <ImageIcon size={18} className="text-muted-foreground opacity-40" />
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold truncate text-white">{item.title}</p>
+                <p className="text-sm font-bold text-white truncate">{item.title}</p>
                 <p className="text-xs text-muted-foreground truncate">{item.excerpt || item.body}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">{item.visible ? 'Visible' : 'Oculta'}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">{item.visible ? "Visible" : "Oculta"}</p>
               </div>
               <button
                 onClick={() => deleteNote.mutate(item.id)}
-                className="p-2 text-destructive hover:bg-destructive/10 rounded-md flex-shrink-0"
+                className="p-2 text-destructive hover:bg-destructive/10 rounded-lg flex-shrink-0"
               >
-                <Trash size={16} />
+                <Trash size={15} />
               </button>
             </div>
-          ))}
-          {(!notes || notes.length === 0) && (
-            <p className="text-sm text-muted-foreground italic">Sin notas todavía.</p>
+          )) : (
+            <p className="text-sm text-muted-foreground italic px-1">Sin notas todavía.</p>
           )}
         </div>
       </section>

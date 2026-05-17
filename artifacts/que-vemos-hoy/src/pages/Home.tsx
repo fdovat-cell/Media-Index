@@ -18,25 +18,34 @@ export default function Home() {
   return (
     <PhoneLayout>
       <div className="flex-1 overflow-y-auto pb-20 no-scrollbar relative">
+
+        {/* HEADER */}
+        <header className="px-5 pt-12 pb-4">
+          <h1 className="text-2xl font-bold tracking-tight text-white">Qué Vemos Hoy</h1>
+          <p className="text-xs text-muted-foreground uppercase tracking-widest mt-0.5">Curaduría personal</p>
+        </header>
+
         {/* HERO SECTION */}
         <section className="relative w-full aspect-[4/5] bg-black">
           {isHeroLoading ? (
             <Skeleton className="w-full h-full bg-card" />
           ) : heroContent && heroContent.length > 0 ? (
             <div className="w-full h-full relative cursor-pointer" onClick={() => setSelectedItem(heroContent[0])}>
-              <div 
+              <div
                 className="absolute inset-0 bg-cover bg-center"
-                style={{ 
+                style={{
                   backgroundImage: `url(${heroContent[0].poster_path ? `https://image.tmdb.org/t/p/w500${heroContent[0].poster_path}` : ''})`
                 }}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
-              
+
               <div className="absolute bottom-0 left-0 w-full p-6 flex flex-col gap-4">
                 <div className="flex flex-col gap-1">
-                  <h1 className="text-4xl font-bold text-white tracking-tight leading-tight">{heroContent[0].original_title || heroContent[0].title}</h1>
+                  <h2 className="text-4xl font-bold text-white tracking-tight leading-tight">
+                    {heroContent[0].title}
+                  </h2>
                   <div className="flex items-center gap-2 text-sm text-gray-300 font-medium mt-1">
-                    {heroContent[0].release_date && <span>{heroContent[0].release_date.substring(0,4)}</span>}
+                    {heroContent[0].release_date && <span>{heroContent[0].release_date.substring(0, 4)}</span>}
                     {heroContent[0].rating && (
                       <span className="flex items-center text-primary">
                         <Star size={14} className="mr-1 fill-primary" /> {heroContent[0].rating}
@@ -44,13 +53,13 @@ export default function Home() {
                     )}
                   </div>
                 </div>
-                
+
                 {heroContent[0].personal_review && (
                   <p className="text-gray-200 text-sm italic border-l-2 border-primary pl-3">
                     "{heroContent[0].personal_review}"
                   </p>
                 )}
-                
+
                 <button className="bg-primary text-primary-foreground font-semibold py-3 px-4 rounded-md w-full mt-2 hover:opacity-90 transition-opacity">
                   Ver reseña completa
                 </button>
@@ -60,19 +69,19 @@ export default function Home() {
         </section>
 
         {/* LO MEJOR ESTA SEMANA */}
-        <ContentSection 
-          title="Lo mejor esta semana" 
-          items={weeklyContent} 
-          isLoading={isWeeklyLoading} 
-          onSelect={setSelectedItem} 
+        <ContentSection
+          title="Lo mejor esta semana"
+          items={weeklyContent}
+          isLoading={isWeeklyLoading}
+          onSelect={setSelectedItem}
         />
 
         {/* IMPERDIBLES */}
-        <ContentSection 
-          title="Imperdibles" 
-          items={classicContent} 
-          isLoading={isClassicLoading} 
-          onSelect={setSelectedItem} 
+        <ContentSection
+          title="Imperdibles"
+          items={classicContent}
+          isLoading={isClassicLoading}
+          onSelect={setSelectedItem}
         />
 
         {/* QUÉ LEEMOS HOY */}
@@ -80,7 +89,7 @@ export default function Home() {
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Qué leemos hoy</h2>
           </div>
-          
+
           <div className="flex gap-4 overflow-x-auto no-scrollbar pb-4 snap-x">
             {isNotesLoading ? (
               Array(3).fill(0).map((_, i) => (
@@ -88,8 +97,8 @@ export default function Home() {
               ))
             ) : notesContent && notesContent.length > 0 ? (
               notesContent.map(note => (
-                <div 
-                  key={note.id} 
+                <div
+                  key={note.id}
                   className="min-w-[280px] w-[280px] bg-card rounded-lg overflow-hidden border border-card-border snap-start cursor-pointer group"
                   onClick={() => setSelectedItem(note)}
                 >
@@ -122,17 +131,17 @@ export default function Home() {
               ))
             ) : upcomingContent && upcomingContent.length > 0 ? (
               upcomingContent.map(item => (
-                <div 
-                  key={item.id} 
+                <div
+                  key={item.id}
                   className="flex gap-3 bg-card rounded-lg p-2 border border-card-border cursor-pointer group hover:border-primary/50 transition-colors"
                   onClick={() => setSelectedItem(item)}
                 >
-                  <div 
+                  <div
                     className="w-16 h-20 rounded bg-cover bg-center flex-shrink-0"
                     style={{ backgroundImage: `url(${item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : ''})` }}
                   />
                   <div className="flex flex-col justify-center">
-                    <h3 className="font-bold text-sm text-white group-hover:text-primary transition-colors line-clamp-1">{item.original_title || item.title}</h3>
+                    <h3 className="font-bold text-sm text-white group-hover:text-primary transition-colors line-clamp-1">{item.title}</h3>
                     <p className="text-xs text-primary font-medium mt-1">{item.release_date}</p>
                     {item.platforms && item.platforms.length > 0 && (
                       <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider">{item.platforms.join(', ')}</p>
@@ -150,7 +159,7 @@ export default function Home() {
           <DetailPopup item={selectedItem} onClose={() => setSelectedItem(null)} />
         )}
       </div>
-      
+
       {/* BOTTOM NAV */}
       <nav className="absolute bottom-0 w-full max-w-[430px] bg-background/95 backdrop-blur-md border-t border-border flex justify-around items-center h-16 px-4 z-40">
         <NavItem label="Hoy" active />
@@ -168,7 +177,7 @@ function ContentSection({ title, items, isLoading, onSelect }: { title: string, 
       <div className="flex justify-between items-center mb-4 pr-4">
         <h2 className="text-xs font-bold tracking-widest uppercase text-muted-foreground">{title}</h2>
       </div>
-      
+
       <div className="flex gap-4 overflow-x-auto no-scrollbar pb-4 snap-x pr-4">
         {isLoading ? (
           Array(4).fill(0).map((_, i) => (
@@ -176,17 +185,17 @@ function ContentSection({ title, items, isLoading, onSelect }: { title: string, 
           ))
         ) : items && items.length > 0 ? (
           items.map(item => (
-            <div 
-              key={item.id} 
+            <div
+              key={item.id}
               className="min-w-[140px] w-[140px] flex flex-col gap-2 snap-start cursor-pointer group"
               onClick={() => onSelect(item)}
             >
-              <div 
+              <div
                 className="w-full aspect-[2/3] rounded-lg bg-cover bg-center shadow-md border border-border group-hover:border-primary/50 transition-colors"
                 style={{ backgroundImage: `url(${item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : ''})` }}
               />
               <div>
-                <h3 className="font-bold text-sm text-white line-clamp-1 group-hover:text-primary transition-colors">{item.original_title || item.title}</h3>
+                <h3 className="font-bold text-sm text-white line-clamp-1 group-hover:text-primary transition-colors">{item.title}</h3>
                 {item.rating && (
                   <div className="flex items-center text-xs text-primary font-medium mt-0.5">
                     <Star size={10} className="mr-1 fill-primary" /> {item.rating}

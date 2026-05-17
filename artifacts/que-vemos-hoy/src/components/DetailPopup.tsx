@@ -65,6 +65,9 @@ export function DetailPopup({ item, onClose }: DetailPopupProps) {
             
             <div className="px-5 -mt-8 relative z-10 flex flex-col gap-4">
               <h1 className="text-3xl font-bold tracking-tight text-white">{item.title}</h1>
+              {item.original_title && item.original_title !== item.title && (
+                <p className="text-xs text-muted-foreground italic mt-1">{item.original_title}</p>
+              )}
               
               <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                 {item.release_date && <span>{item.release_date.substring(0, 4)}</span>}

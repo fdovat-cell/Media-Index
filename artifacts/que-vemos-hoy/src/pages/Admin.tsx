@@ -87,25 +87,40 @@ function AdminContent() {
   const { data: searchResults, isLoading: isSearching } = useTmdbSearch(searchQuery);
   const [selectedSection, setSelectedSection] = useState("weekly");
 
-  const handleAddContent = (item: any) => {
+  // Mini-form state for adding with review
+  const [pendingItem, setPendingItem] = useState<any>(null);
+  const [pendingReview, setPendingReview] = useState("");
+  const [pendingPlatforms, setPendingPlatforms] = useState("");
+
+  const handleSelectItem = (item: any) => {
+    setPendingItem(item);
+    setPendingReview("");
+    setPendingPlatforms("");
+    setSearchQuery("");
+  };
+
+  const handleConfirmAdd = () => {
+    if (!pendingItem) return;
     addContent.mutate({
-      tmdb_id: item.id,
-      media_type: item.media_type,
+      tmdb_id: pendingItem.id,
+      media_type: pendingItem.media_type,
       section: selectedSection as any,
-      title: item.original_title || item.original_name || item.title || item.name,
-      original_title: item.original_title || item.original_name,
-      overview: item.overview,
-      poster_path: item.poster_path,
-      backdrop_path: item.backdrop_path,
-      release_date: item.release_date || item.first_air_date,
-      rating: item.vote_average,
-      vote_count: item.vote_count,
-      platforms: [],
-      personal_review: "",
+      title: pendingItem.original_title || pendingItem.original_name || pendingItem.title || pendingItem.name,
+      original_title: pendingItem.original_title || pendingItem.original_name,
+      overview: pendingItem.overview,
+      poster_path: pendingItem.poster_path,
+      backdrop_path: pendingItem.backdrop_path,
+      release_date: pendingItem.release_date || pendingItem.first_air_date,
+      rating: pendingItem.vote_average,
+      vote_count: pendingItem.vote_count,
+      platforms: pendingPlatforms ? pendingPlatforms.split(",").map(p => p.trim()).filter(Boolean) : [],
+      personal_review: pendingReview.trim(),
       visible: true,
       display_order: 0
     });
-    setSearchQuery("");
+    setPendingItem(null);
+    setPendingReview("");
+    setPendingPlatforms("");
   };
 
   return (
@@ -125,6 +140,52 @@ function AdminContent() {
             <option value="upcoming">Próximos Estrenos</option>
           </select>
         </div>
+
+        {/* Pending item — review form */}
+        {pendingItem && (
+          <div className="mb-4 p-3 bg-background border border-primary/50 rounded-lg flex flex-col gap-3">
+            <div className="flex gap-3 items-center">
+              <div 
+                className="w-10 h-14 bg-muted rounded bg-cover flex-shrink-0"
+                style={{ backgroundImage: pendingItem.poster_path ? `url(https://image.tmdb.org/t/p/w200${pendingItem.poster_path})` : 'none' }}
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold truncate text-white">
+                  {pendingItem.original_title || pendingItem.original_name || pendingItem.title || pendingItem.name}
+                </p>
+                <p className="text-xs text-muted-foreground capitalize">{pendingItem.media_type} • {(pendingItem.release_date || pendingItem.first_air_date || "").substring(0,4)}</p>
+              </div>
+            </div>
+            <textarea
+              placeholder="Tu reseña o comentario personal (opcional)..."
+              value={pendingReview}
+              onChange={e => setPendingReview(e.target.value)}
+              rows={3}
+              className="w-full bg-card border border-border rounded p-2 focus:outline-none focus:border-primary text-sm text-white resize-none"
+            />
+            <input
+              type="text"
+              placeholder="Plataforma (ej: Netflix, HBO, Disney+)"
+              value={pendingPlatforms}
+              onChange={e => setPendingPlatforms(e.target.value)}
+              className="w-full bg-card border border-border rounded p-2 focus:outline-none focus:border-primary text-sm"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={handleConfirmAdd}
+                className="flex-1 bg-primary text-primary-foreground font-bold py-2 rounded-md text-sm hover:opacity-90"
+              >
+                Guardar
+              </button>
+              <button
+                onClick={() => setPendingItem(null)}
+                className="px-4 py-2 border border-border rounded-md text-sm text-muted-foreground hover:text-white"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
         
         <div className="relative mb-4">
           <Search size={16} className="absolute left-3 top-3 text-muted-foreground" />
@@ -149,11 +210,13 @@ function AdminContent() {
                     style={{ backgroundImage: item.poster_path ? `url(https://image.tmdb.org/t/p/w200${item.poster_path})` : 'none' }}
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold truncate">{item.title || item.name}</p>
-                    <p className="text-xs text-muted-foreground">{item.release_date || item.first_air_date} • {item.media_type}</p>
+                    <p className="text-sm font-bold truncate">
+                      {item.original_title || item.original_name || item.title || item.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{(item.release_date || item.first_air_date || "").substring(0,4)} • {item.media_type}</p>
                   </div>
                   <button 
-                    onClick={() => handleAddContent(item)}
+                    onClick={() => handleSelectItem(item)}
                     className="p-2 bg-primary/20 text-primary rounded-md hover:bg-primary hover:text-primary-foreground"
                   >
                     <Plus size={16} />

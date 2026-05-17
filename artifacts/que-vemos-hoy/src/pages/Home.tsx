@@ -34,7 +34,7 @@ export default function Home() {
               
               <div className="absolute bottom-0 left-0 w-full p-6 flex flex-col gap-4">
                 <div className="flex flex-col gap-1">
-                  <h1 className="text-4xl font-bold text-white tracking-tight leading-tight">{heroContent[0].title}</h1>
+                  <h1 className="text-4xl font-bold text-white tracking-tight leading-tight">{heroContent[0].original_title || heroContent[0].title}</h1>
                   <div className="flex items-center gap-2 text-sm text-gray-300 font-medium mt-1">
                     {heroContent[0].release_date && <span>{heroContent[0].release_date.substring(0,4)}</span>}
                     {heroContent[0].rating && (
@@ -132,7 +132,7 @@ export default function Home() {
                     style={{ backgroundImage: `url(${item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : ''})` }}
                   />
                   <div className="flex flex-col justify-center">
-                    <h3 className="font-bold text-sm text-white group-hover:text-primary transition-colors line-clamp-1">{item.title}</h3>
+                    <h3 className="font-bold text-sm text-white group-hover:text-primary transition-colors line-clamp-1">{item.original_title || item.title}</h3>
                     <p className="text-xs text-primary font-medium mt-1">{item.release_date}</p>
                     {item.platforms && item.platforms.length > 0 && (
                       <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider">{item.platforms.join(', ')}</p>
@@ -186,7 +186,7 @@ function ContentSection({ title, items, isLoading, onSelect }: { title: string, 
                 style={{ backgroundImage: `url(${item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : ''})` }}
               />
               <div>
-                <h3 className="font-bold text-sm text-white line-clamp-1 group-hover:text-primary transition-colors">{item.title}</h3>
+                <h3 className="font-bold text-sm text-white line-clamp-1 group-hover:text-primary transition-colors">{item.original_title || item.title}</h3>
                 {item.rating && (
                   <div className="flex items-center text-xs text-primary font-medium mt-0.5">
                     <Star size={10} className="mr-1 fill-primary" /> {item.rating}

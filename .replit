@@ -26,3 +26,15 @@ externalPort = 8080
 [[ports]]
 localPort = 8081
 externalPort = 80
+
+[[ports]]
+localPort = 19924
+externalPort = 3000
+
+[userenv]
+
+[userenv.shared]
+VITE_SUPABASE_URL = "https://nqdtvrgkzrnjojrwwqoy.supabase.co"
+VITE_SUPABASE_ANON_KEY = "sb_publishable_XlNkBdOlkn2VNvt8cdsIQw_aGMvIyGN"
+VITE_TMDB_API_KEY = "8850237f61f6ae4c4b0b5426a7b5cc83"
+VITE_TMDB_BEARER_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI4ODUwMjM3ZjYxZjZhZTRjNGIwYjU0MjZhN2I1Y2M4MyIsIm5iZiI6MTc3ODI3MjQxMC4wNDQsInN1YiI6IjY5ZmU0ODlhMTJhOGQ2Y2UxZjRjNzE4NCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.3T_nng-lBkBI3GGlZq92SLAiMFM0r0lgqL8NJyTiuf0"

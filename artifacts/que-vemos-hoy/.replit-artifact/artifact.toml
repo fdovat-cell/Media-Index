@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Qué Vemos Hoy"
+version = "1.0.0"
+id = "artifacts/que-vemos-hoy"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19924
+
+[services.development]
+run = "pnpm --filter @workspace/que-vemos-hoy run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/que-vemos-hoy", "run", "build" ]
+publicDir = "artifacts/que-vemos-hoy/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19924"
+BASE_PATH = "/"

@@ -11,7 +11,7 @@ export function useTmdbSearch(query: string) {
     queryKey: ["tmdb", query],
     queryFn: async () => {
       if (!query || query.length < 3) return [];
-      const res = await fetch(`https://api.themoviedb.org/3/search/multi?query=${encodeURIComponent(query)}&language=es-419&region=AR`, {
+      const res = await fetch(`https://api.themoviedb.org/3/search/multi?query=${encodeURIComponent(query)}&language=en-US`, {
         headers: {
           Authorization: `Bearer ${TMDB_TOKEN}`,
           accept: "application/json"

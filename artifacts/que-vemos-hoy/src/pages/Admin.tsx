@@ -92,7 +92,7 @@ function AdminContent() {
       tmdb_id: item.id,
       media_type: item.media_type,
       section: selectedSection as any,
-      title: item.title || item.name,
+      title: item.original_title || item.original_name || item.title || item.name,
       original_title: item.original_title || item.original_name,
       overview: item.overview,
       poster_path: item.poster_path,

@@ -1,0 +1,13 @@
+[build]
+  base    = "artifacts/que-vemos-hoy"
+  command = "pnpm install && pnpm run build"
+  publish = "dist/public"
+
+[build.environment]
+  NODE_VERSION = "20"
+  BASE_PATH    = "/"
+
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200

@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { ContentRow, NoteRow } from "@/lib/database.types";
-import { X, Star, Send, ExternalLink, Share2, Play } from "lucide-react";
+import { X, Star, Send, ExternalLink, Share2 } from "lucide-react";
 import { useComments, useMutateComments, useRatings, useMutateRatings } from "@/hooks/use-data";
 import { format } from "date-fns";
 
@@ -9,39 +8,6 @@ type DetailPopupProps = {
   item: ContentRow | NoteRow | null;
   onClose: () => void;
 };
-
-const TMDB_TOKEN = import.meta.env.VITE_TMDB_BEARER_TOKEN;
-
-function useTrailer(tmdbId: number | null, mediaType: "movie" | "tv" | null) {
-  return useQuery({
-    queryKey: ["trailer", tmdbId, mediaType],
-    queryFn: async () => {
-      if (!tmdbId || !mediaType || !TMDB_TOKEN) return null;
-      const res = await fetch(
-        `https://api.themoviedb.org/3/${mediaType}/${tmdbId}/videos?language=es-419`,
-        { headers: { Authorization: `Bearer ${TMDB_TOKEN}`, accept: "application/json" } }
-      );
-      if (!res.ok) return null;
-      const data = await res.json();
-      const trailer = (data.results || []).find(
-        (v: any) => v.site === "YouTube" && (v.type === "Trailer" || v.type === "Teaser")
-      );
-      if (trailer) return trailer.key as string;
-      // fallback: English
-      const res2 = await fetch(
-        `https://api.themoviedb.org/3/${mediaType}/${tmdbId}/videos?language=en-US`,
-        { headers: { Authorization: `Bearer ${TMDB_TOKEN}`, accept: "application/json" } }
-      );
-      if (!res2.ok) return null;
-      const data2 = await res2.json();
-      const trailer2 = (data2.results || []).find(
-        (v: any) => v.site === "YouTube" && (v.type === "Trailer" || v.type === "Teaser")
-      );
-      return trailer2?.key ?? null;
-    },
-    enabled: !!tmdbId && !!mediaType,
-  });
-}
 
 function getPlatformUrl(platform: string, title: string): string {
   const encoded = encodeURIComponent(title);
@@ -155,12 +121,10 @@ function ShareButton({ title, review }: { title: string; review?: string | null 
 
 export function DetailPopup({ item, onClose }: DetailPopupProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [showTrailer, setShowTrailer] = useState(false);
 
   useEffect(() => {
     if (!item) return;
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
-    setShowTrailer(false);
     window.history.pushState({ popup: true }, "");
     const handlePopState = () => { onClose(); };
     window.addEventListener("popstate", handlePopState);
@@ -176,10 +140,6 @@ export function DetailPopup({ item, onClose }: DetailPopupProps) {
 
   const { data: comments, isLoading: commentsLoading } = useComments(contentId, noteId);
   const { addComment } = useMutateComments();
-  const { data: trailerKey } = useTrailer(
-    isContent ? (item as ContentRow).tmdb_id : null,
-    isContent ? (item as ContentRow).media_type : null
-  );
 
   const [authorName, setAuthorName] = useState("");
   const [commentBody, setCommentBody] = useState("");
@@ -214,40 +174,18 @@ export function DetailPopup({ item, onClose }: DetailPopupProps) {
         <div ref={scrollRef} className="flex-1 overflow-y-auto no-scrollbar">
           {isContent ? (
             <>
-              {/* Imagen / Trailer */}
               <div className="w-full relative bg-black" style={{ aspectRatio: "16/9", maxHeight: "280px" }}>
-                {showTrailer && trailerKey ? (
-                  <iframe
-                    src={`https://www.youtube.com/embed/${trailerKey}?autoplay=1`}
-                    className="absolute inset-0 w-full h-full"
-                    allow="autoplay; fullscreen"
-                    allowFullScreen
-                  />
-                ) : (
-                  <>
-                    <div
-                      className="absolute inset-0 bg-cover bg-center"
-                      style={{
-                        backgroundImage: `url(${(item as ContentRow).backdrop_path
-                          ? `https://image.tmdb.org/t/p/original${(item as ContentRow).backdrop_path}`
-                          : (item as ContentRow).poster_path
-                          ? `https://image.tmdb.org/t/p/w500${(item as ContentRow).poster_path}`
-                          : ''})`
-                      }}
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent" />
-                    {trailerKey && (
-                      <button
-                        onClick={() => setShowTrailer(true)}
-                        className="absolute inset-0 flex items-center justify-center group"
-                      >
-                        <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/30 transition-colors border border-white/30">
-                          <Play size={22} className="text-white fill-white ml-1" />
-                        </div>
-                      </button>
-                    )}
-                  </>
-                )}
+                <div
+                  className="absolute inset-0 bg-cover bg-center"
+                  style={{
+                    backgroundImage: `url(${(item as ContentRow).backdrop_path
+                      ? `https://image.tmdb.org/t/p/original${(item as ContentRow).backdrop_path}`
+                      : (item as ContentRow).poster_path
+                      ? `https://image.tmdb.org/t/p/w500${(item as ContentRow).poster_path}`
+                      : ''})`
+                  }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent" />
               </div>
 
               <div className="px-5 -mt-8 relative z-10 flex flex-col gap-4 pb-2">
@@ -268,13 +206,12 @@ export function DetailPopup({ item, onClose }: DetailPopupProps) {
                   )}
                 </div>
 
-                {/* Botones plataformas + compartir */}
                 <div className="flex flex-wrap gap-2">
                   {(item as ContentRow).platforms?.map((platform) => {
                     const url = getPlatformUrl(platform, (item as ContentRow).title);
                     const colorClass = getPlatformColor(platform);
                     return url ? (
-                      <a
+                      
                         key={platform}
                         href={url}
                         target="_blank"
@@ -293,7 +230,6 @@ export function DetailPopup({ item, onClose }: DetailPopupProps) {
                   <ShareButton title={(item as ContentRow).title} review={(item as ContentRow).personal_review} />
                 </div>
 
-                {/* Valoración */}
                 <div className="p-4 rounded-lg bg-card border border-card-border">
                   <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Tu valoración</p>
                   <StarRating contentId={id} title={(item as ContentRow).title} />
@@ -339,7 +275,6 @@ export function DetailPopup({ item, onClose }: DetailPopupProps) {
             </>
           )}
 
-          {/* Comentarios */}
           <div className="mt-4 px-5 pb-12 border-t border-border pt-6">
             <h3 className="text-lg font-bold mb-4">Comentarios</h3>
 

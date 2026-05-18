@@ -21,21 +21,6 @@ function filterTmdb(item: any) {
   return true;
 }
 
-// Trae sinopsis en español para un item dado
-async function fetchOverviewEs(tmdbId: number, mediaType: "movie" | "tv"): Promise<string | null> {
-  try {
-    const res = await fetch(
-      `https://api.themoviedb.org/3/${mediaType}/${tmdbId}?language=es-419`,
-      { headers: TMDB_HEADERS }
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.overview || null;
-  } catch {
-    return null;
-  }
-}
-
 function tmdbToContent(item: any, section: ContentSection): Omit<ContentRow, "id" | "created_at" | "updated_at"> {
   const originalTitle = item.original_title || item.original_name || null;
   const displayTitle = item.title || item.name;
@@ -59,7 +44,7 @@ function tmdbToContent(item: any, section: ContentSection): Omit<ContentRow, "id
   };
 }
 
-// ── Search — títulos en inglés ────────────────────────────────────────────────
+// ── Search ────────────────────────────────────────────────────────────────────
 
 export function useTmdbSearch(query: string) {
   return useQuery({
@@ -67,7 +52,7 @@ export function useTmdbSearch(query: string) {
     queryFn: async () => {
       if (!query || query.length < 3) return [];
       const res = await fetch(
-        `https://api.themoviedb.org/3/search/multi?query=${encodeURIComponent(query)}&language=en-US`,
+        `https://api.themoviedb.org/3/search/multi?query=${encodeURIComponent(query)}&language=es-419`,
         { headers: TMDB_HEADERS }
       );
       if (!res.ok) throw new Error("TMDB Search failed");
@@ -94,9 +79,8 @@ export function useSyncFromTmdb() {
       const existingIds = await getExistingIds();
       const today = new Date().toISOString().split("T")[0];
 
-      // Títulos en inglés
       const res = await fetch(
-        "https://api.themoviedb.org/3/trending/all/week?language=en-US",
+        "https://api.themoviedb.org/3/trending/all/week?language=es-419",
         { headers: TMDB_HEADERS }
       );
       if (!res.ok) throw new Error("TMDB trending failed");
@@ -112,13 +96,7 @@ export function useSyncFromTmdb() {
         return true;
       }).slice(0, 12);
 
-      // Sinopsis en español para cada item
-      const items = await Promise.all(
-        filtered.map(async (item: any) => {
-          const overviewEs = await fetchOverviewEs(item.id, item.media_type);
-          return { ...tmdbToContent(item, "weekly"), overview: overviewEs || item.overview || null };
-        })
-      );
+      const items = filtered.map((item: any) => tmdbToContent(item, "weekly"));
 
       if (items.length === 0) return 0;
       const { error } = await supabase.from("content").insert(items);
@@ -137,11 +115,13 @@ export function useSyncFromTmdb() {
       const existingIds = await getExistingIds();
       const today = new Date().toISOString().split("T")[0];
 
-      // Títulos en inglés
+      // Eliminar estrenos que ya pasaron
+      await supabase.from("content").delete().eq("section", "upcoming").lt("release_date", today);
+
       const [page1, page2, page3] = await Promise.all([
-        fetch("https://api.themoviedb.org/3/movie/upcoming?language=en-US&page=1&region=US", { headers: TMDB_HEADERS }).then(r => r.json()),
-        fetch("https://api.themoviedb.org/3/movie/upcoming?language=en-US&page=2&region=US", { headers: TMDB_HEADERS }).then(r => r.json()),
-        fetch("https://api.themoviedb.org/3/movie/upcoming?language=en-US&page=3&region=US", { headers: TMDB_HEADERS }).then(r => r.json()),
+        fetch("https://api.themoviedb.org/3/movie/upcoming?language=es-419&page=1&region=AR", { headers: TMDB_HEADERS }).then(r => r.json()),
+        fetch("https://api.themoviedb.org/3/movie/upcoming?language=es-419&page=2&region=AR", { headers: TMDB_HEADERS }).then(r => r.json()),
+        fetch("https://api.themoviedb.org/3/movie/upcoming?language=es-419&page=3&region=AR", { headers: TMDB_HEADERS }).then(r => r.json()),
       ]);
 
       const all = [...(page1.results || []), ...(page2.results || []), ...(page3.results || [])];
@@ -156,13 +136,10 @@ export function useSyncFromTmdb() {
         .sort((a: any, b: any) => a.release_date.localeCompare(b.release_date))
         .slice(0, 20);
 
-      // Sinopsis en español para cada item
-      const items = await Promise.all(
-        filtered.map(async (item: any) => {
-          const overviewEs = await fetchOverviewEs(item.id, "movie");
-          return { ...tmdbToContent(item, "upcoming"), media_type: "movie" as const, overview: overviewEs || item.overview || null };
-        })
-      );
+      const items = filtered.map((item: any) => ({
+        ...tmdbToContent(item, "upcoming"),
+        media_type: "movie" as const
+      }));
 
       if (items.length === 0) return 0;
       const { error } = await supabase.from("content").insert(items);

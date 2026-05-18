@@ -17,7 +17,7 @@ export default function Home() {
 
   return (
     <PhoneLayout>
-      <div className="flex-1 overflow-y-auto pb-20 no-scrollbar relative">
+      <div className="flex-1 overflow-y-auto pb-8 no-scrollbar relative">
 
         {/* HEADER */}
         <header className="px-5 pt-12 pb-4">
@@ -42,7 +42,6 @@ export default function Home() {
               />
               <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent" />
 
-              {/* Etiqueta superior */}
               <div className="absolute top-3 left-4">
                 <span className="text-[10px] font-bold tracking-widest uppercase text-primary">Recomendación del día</span>
               </div>
@@ -132,7 +131,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* PRÓXIMOS ESTRENOS — scroll horizontal igual que las otras secciones */}
+        {/* PRÓXIMOS ESTRENOS */}
         <ContentSection
           title="Próximos estrenos"
           items={upcomingContent}
@@ -145,14 +144,6 @@ export default function Home() {
           <DetailPopup item={selectedItem} onClose={() => setSelectedItem(null)} />
         )}
       </div>
-
-      {/* BOTTOM NAV */}
-      <nav className="absolute bottom-0 w-full max-w-[430px] bg-background/95 backdrop-blur-md border-t border-border flex justify-around items-center h-16 px-4 z-40">
-        <NavItem label="Hoy" active />
-        <NavItem label="Estrenos" />
-        <NavItem label="Imperdibles" />
-        <NavItem label="Notas" />
-      </nav>
     </PhoneLayout>
   );
 }
@@ -185,7 +176,7 @@ function ContentSection({
           items.map(item => (
             <div
               key={item.id}
-              className="min-w-[140px] w-[140px] flex flex-col gap-2 snap-start cursor-pointer group"
+              className="min-w-[140px] w-[140px] flex flex-col gap-1 snap-start cursor-pointer group"
               onClick={() => onSelect(item)}
             >
               <div
@@ -194,9 +185,13 @@ function ContentSection({
               />
               <div>
                 <h3 className="font-bold text-sm text-white line-clamp-1 group-hover:text-primary transition-colors">{item.title}</h3>
+                {/* Reseña personal sutil debajo del título */}
+                {item.personal_review && (
+                  <p className="text-[11px] text-muted-foreground italic line-clamp-1 mt-0.5">"{item.personal_review}"</p>
+                )}
                 {showDate && item.release_date ? (
                   <p className="text-xs text-primary font-medium mt-0.5">{item.release_date}</p>
-                ) : item.rating ? (
+                ) : !item.personal_review && item.rating ? (
                   <div className="flex items-center text-xs text-primary font-medium mt-0.5">
                     <Star size={10} className="mr-1 fill-primary" /> {item.rating}
                   </div>
@@ -209,13 +204,5 @@ function ContentSection({
         )}
       </div>
     </section>
-  );
-}
-
-function NavItem({ label, active }: { label: string; active?: boolean }) {
-  return (
-    <button className={`flex flex-col items-center justify-center gap-1 w-full h-full ${active ? "text-primary" : "text-muted-foreground hover:text-foreground transition-colors"}`}>
-      <span className="text-[10px] font-bold uppercase tracking-widest">{label}</span>
-    </button>
   );
 }

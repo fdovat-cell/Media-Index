@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { useAllContent, useNotes } from "@/hooks/use-data";
 import { useMutateContent, useTmdbSearch, useMutateNotes, useSyncFromTmdb } from "@/hooks/use-admin";
-import { Trash, LogOut, Plus, Search, RefreshCw, ImageIcon, GripVertical } from "lucide-react";
+import { Trash, LogOut, Plus, Search, RefreshCw, ImageIcon, GripVertical, Pencil, Check } from "lucide-react";
 import { ContentRow, NoteRow } from "@/lib/database.types";
 
 export default function Admin() {
@@ -104,7 +104,6 @@ function useDragReorder<T extends { id: string; display_order: number }>(
   const [list, setList] = useState<T[]>([]);
   const [dirty, setDirty] = useState(false);
 
-  // Sync from props when not dragging
   const activeList = dirty ? list : items;
 
   const onDragStart = (id: string) => {
@@ -137,6 +136,171 @@ function useDragReorder<T extends { id: string; display_order: number }>(
   return { activeList, dirty, onDragStart, onDragOver, onDragEnd, saveOrder };
 }
 
+// ── Inline editor for content items ──────────────────────────────────────────
+
+function ContentItemEditor({
+  item,
+  onSave,
+  onCancel,
+  isSaving,
+}: {
+  item: ContentRow;
+  onSave: (updates: Partial<ContentRow>) => void;
+  onCancel: () => void;
+  isSaving: boolean;
+}) {
+  const [title, setTitle] = useState(item.title);
+  const [review, setReview] = useState(item.personal_review ?? "");
+  const [platforms, setPlatforms] = useState((item.platforms ?? []).join(", "));
+  const [section, setSection] = useState(item.section);
+  const [visible, setVisible] = useState(item.visible);
+
+  const handleSave = () => {
+    onSave({
+      title: title.trim() || item.title,
+      personal_review: review.trim() || null,
+      platforms: platforms ? platforms.split(",").map(p => p.trim()).filter(Boolean) : [],
+      section: section as any,
+      visible,
+    });
+  };
+
+  return (
+    <div className="mt-2 flex flex-col gap-2 border-t border-border pt-3">
+      <input
+        type="text"
+        value={title}
+        onChange={e => setTitle(e.target.value)}
+        placeholder="Título"
+        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-primary"
+      />
+      <textarea
+        value={review}
+        onChange={e => setReview(e.target.value)}
+        placeholder="Reseña personal (opcional)..."
+        rows={3}
+        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-primary resize-none"
+      />
+      <input
+        type="text"
+        value={platforms}
+        onChange={e => setPlatforms(e.target.value)}
+        placeholder="Plataforma (ej: Netflix, HBO)"
+        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary"
+      />
+      <select
+        value={section}
+        onChange={e => setSection(e.target.value as any)}
+        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary"
+      >
+        <option value="hero">Hero (destacado principal)</option>
+        <option value="weekly">Lo mejor esta semana</option>
+        <option value="classic">Imperdibles</option>
+        <option value="upcoming">Próximos estrenos</option>
+      </select>
+      <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+        <input type="checkbox" checked={visible} onChange={e => setVisible(e.target.checked)} className="accent-primary w-4 h-4" />
+        Visible para los visitantes
+      </label>
+      <div className="flex gap-2 mt-1">
+        <button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="flex-1 flex items-center justify-center gap-1.5 bg-primary text-primary-foreground font-bold py-2 rounded-lg text-sm hover:opacity-90 disabled:opacity-50"
+        >
+          <Check size={14} /> {isSaving ? "Guardando..." : "Guardar"}
+        </button>
+        <button onClick={onCancel} className="px-4 py-2 border border-border rounded-lg text-sm text-muted-foreground hover:text-white">
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Inline editor for notes ───────────────────────────────────────────────────
+
+function NoteItemEditor({
+  item,
+  onSave,
+  onCancel,
+  isSaving,
+}: {
+  item: NoteRow;
+  onSave: (updates: Partial<NoteRow>) => void;
+  onCancel: () => void;
+  isSaving: boolean;
+}) {
+  const [title, setTitle] = useState(item.title);
+  const [body, setBody] = useState(item.body);
+  const [excerpt, setExcerpt] = useState(item.excerpt ?? "");
+  const [imageUrl, setImageUrl] = useState(item.image_url ?? "");
+  const [visible, setVisible] = useState(item.visible);
+
+  const handleSave = () => {
+    onSave({
+      title: title.trim() || item.title,
+      body: body.trim() || item.body,
+      excerpt: excerpt.trim() || null,
+      image_url: imageUrl.trim() || null,
+      visible,
+    });
+  };
+
+  return (
+    <div className="mt-2 flex flex-col gap-2 border-t border-border pt-3">
+      <input
+        type="text"
+        value={title}
+        onChange={e => setTitle(e.target.value)}
+        placeholder="Título"
+        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-primary"
+      />
+      <textarea
+        value={body}
+        onChange={e => setBody(e.target.value)}
+        placeholder="Texto completo..."
+        rows={5}
+        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-primary resize-none"
+      />
+      <input
+        type="text"
+        value={excerpt}
+        onChange={e => setExcerpt(e.target.value)}
+        placeholder="Resumen corto (aparece en la tarjeta)"
+        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary"
+      />
+      <div className="relative">
+        <ImageIcon size={14} className="absolute left-3 top-3 text-muted-foreground" />
+        <input
+          type="url"
+          value={imageUrl}
+          onChange={e => setImageUrl(e.target.value)}
+          placeholder="URL de imagen de portada"
+          className="w-full bg-background border border-border rounded-lg px-3 py-2 pl-9 text-sm focus:outline-none focus:border-primary"
+        />
+      </div>
+      {imageUrl && <div className="w-full h-24 rounded-lg bg-cover bg-center border border-border" style={{ backgroundImage: `url(${imageUrl})` }} />}
+      <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+        <input type="checkbox" checked={visible} onChange={e => setVisible(e.target.checked)} className="accent-primary w-4 h-4" />
+        Visible para los visitantes
+      </label>
+      <div className="flex gap-2 mt-1">
+        <button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="flex-1 flex items-center justify-center gap-1.5 bg-primary text-primary-foreground font-bold py-2 rounded-lg text-sm hover:opacity-90 disabled:opacity-50"
+        >
+          <Check size={14} /> {isSaving ? "Guardando..." : "Guardar"}
+        </button>
+        <button onClick={onCancel} className="px-4 py-2 border border-border rounded-lg text-sm text-muted-foreground hover:text-white">
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 function AdminContent() {
@@ -152,6 +316,9 @@ function AdminContent() {
   const [pendingItem, setPendingItem] = useState<any>(null);
   const [pendingReview, setPendingReview] = useState("");
   const [pendingPlatforms, setPendingPlatforms] = useState("");
+
+  const [editingContentId, setEditingContentId] = useState<string | null>(null);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
 
   const handleSelectItem = (item: any) => {
     setPendingItem(item);
@@ -197,7 +364,6 @@ function AdminContent() {
     );
   };
 
-  // ── Drag reorder for content ──
   const contentDrag = useDragReorder(content ?? [], (ordered) => {
     ordered.forEach((item, idx) => {
       if (item.display_order !== idx) {
@@ -206,7 +372,6 @@ function AdminContent() {
     });
   });
 
-  // ── Drag reorder for notes ──
   const notesDrag = useDragReorder(notes ?? [], (ordered) => {
     ordered.forEach((item, idx) => {
       if (item.display_order !== idx) {
@@ -349,15 +514,12 @@ function AdminContent() {
         </Card>
       </section>
 
-      {/* ── 4. CONTENIDO — DRAG TO REORDER ───────────────────────── */}
+      {/* ── 4. CONTENIDO — DRAG TO REORDER + EDIT ────────────────── */}
       <section>
         <div className="flex items-center justify-between mb-3">
           <SectionLabel>Contenido guardado ({content?.length ?? 0})</SectionLabel>
           {contentDrag.dirty && (
-            <button
-              onClick={contentDrag.saveOrder}
-              className="text-[10px] font-bold uppercase tracking-widest text-primary bg-primary/10 px-3 py-1 rounded-lg hover:bg-primary hover:text-primary-foreground transition-colors"
-            >
+            <button onClick={contentDrag.saveOrder} className="text-[10px] font-bold uppercase tracking-widest text-primary bg-primary/10 px-3 py-1 rounded-lg hover:bg-primary hover:text-primary-foreground transition-colors">
               Guardar orden
             </button>
           )}
@@ -366,25 +528,44 @@ function AdminContent() {
           {contentDrag.activeList.length > 0 ? contentDrag.activeList.map((item: ContentRow) => (
             <div
               key={item.id}
-              draggable
-              onDragStart={() => contentDrag.onDragStart(item.id)}
+              draggable={editingContentId !== item.id}
+              onDragStart={() => editingContentId !== item.id && contentDrag.onDragStart(item.id)}
               onDragOver={e => contentDrag.onDragOver(e, item.id)}
               onDragEnd={contentDrag.onDragEnd}
-              className="flex gap-3 p-3 bg-card rounded-xl border border-border items-center cursor-grab active:cursor-grabbing active:border-primary/50 active:bg-card/80"
+              className="flex flex-col p-3 bg-card rounded-xl border border-border"
             >
-              <GripVertical size={16} className="text-muted-foreground flex-shrink-0 opacity-40" />
-              <div className="w-11 h-14 bg-muted rounded-lg bg-cover flex-shrink-0" style={{ backgroundImage: item.poster_path ? `url(https://image.tmdb.org/t/p/w200${item.poster_path})` : "none" }} />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-white truncate">{item.title}</p>
-                <p className="text-xs text-muted-foreground">
-                  <span className="text-primary uppercase tracking-wider">{item.section}</span>
-                  {item.platforms && item.platforms.length > 0 && ` · ${item.platforms.join(", ")}`}
-                </p>
-                {item.personal_review && <p className="text-[11px] text-gray-500 italic truncate mt-0.5">"{item.personal_review}"</p>}
+              <div className="flex gap-3 items-center">
+                <GripVertical size={16} className="text-muted-foreground flex-shrink-0 opacity-40" />
+                <div className="w-11 h-14 bg-muted rounded-lg bg-cover flex-shrink-0" style={{ backgroundImage: item.poster_path ? `url(https://image.tmdb.org/t/p/w200${item.poster_path})` : "none" }} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-white truncate">{item.title}</p>
+                  <p className="text-xs text-muted-foreground">
+                    <span className="text-primary uppercase tracking-wider">{item.section}</span>
+                    {item.platforms && item.platforms.length > 0 && ` · ${item.platforms.join(", ")}`}
+                  </p>
+                  {item.personal_review && <p className="text-[11px] text-gray-500 italic truncate mt-0.5">"{item.personal_review}"</p>}
+                  {!item.visible && <p className="text-[10px] text-amber-500 mt-0.5">Oculto</p>}
+                </div>
+                <div className="flex gap-1 flex-shrink-0">
+                  <button
+                    onClick={() => setEditingContentId(editingContentId === item.id ? null : item.id)}
+                    className={`p-2 rounded-lg transition-colors ${editingContentId === item.id ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-primary/10 hover:text-primary'}`}
+                  >
+                    <Pencil size={14} />
+                  </button>
+                  <button onClick={() => deleteContent.mutate(item.id)} className="p-2 text-destructive hover:bg-destructive/10 rounded-lg">
+                    <Trash size={15} />
+                  </button>
+                </div>
               </div>
-              <button onClick={() => deleteContent.mutate(item.id)} className="p-2 text-destructive hover:bg-destructive/10 rounded-lg flex-shrink-0">
-                <Trash size={15} />
-              </button>
+              {editingContentId === item.id && (
+                <ContentItemEditor
+                  item={item}
+                  isSaving={updateContent.isPending}
+                  onSave={(updates) => updateContent.mutate({ id: item.id, updates }, { onSuccess: () => setEditingContentId(null) })}
+                  onCancel={() => setEditingContentId(null)}
+                />
+              )}
             </div>
           )) : (
             <p className="text-sm text-muted-foreground italic px-1">Sin contenido todavía.</p>
@@ -392,15 +573,12 @@ function AdminContent() {
         </div>
       </section>
 
-      {/* ── 5. NOTAS — DRAG TO REORDER ───────────────────────────── */}
+      {/* ── 5. NOTAS — DRAG TO REORDER + EDIT ───────────────────── */}
       <section>
         <div className="flex items-center justify-between mb-3">
           <SectionLabel>Notas publicadas ({notes?.length ?? 0})</SectionLabel>
           {notesDrag.dirty && (
-            <button
-              onClick={notesDrag.saveOrder}
-              className="text-[10px] font-bold uppercase tracking-widest text-primary bg-primary/10 px-3 py-1 rounded-lg hover:bg-primary hover:text-primary-foreground transition-colors"
-            >
+            <button onClick={notesDrag.saveOrder} className="text-[10px] font-bold uppercase tracking-widest text-primary bg-primary/10 px-3 py-1 rounded-lg hover:bg-primary hover:text-primary-foreground transition-colors">
               Guardar orden
             </button>
           )}
@@ -409,28 +587,46 @@ function AdminContent() {
           {notesDrag.activeList.length > 0 ? notesDrag.activeList.map((item: NoteRow) => (
             <div
               key={item.id}
-              draggable
-              onDragStart={() => notesDrag.onDragStart(item.id)}
+              draggable={editingNoteId !== item.id}
+              onDragStart={() => editingNoteId !== item.id && notesDrag.onDragStart(item.id)}
               onDragOver={e => notesDrag.onDragOver(e, item.id)}
               onDragEnd={notesDrag.onDragEnd}
-              className="flex gap-3 p-3 bg-card rounded-xl border border-border items-center cursor-grab active:cursor-grabbing active:border-primary/50"
+              className="flex flex-col p-3 bg-card rounded-xl border border-border"
             >
-              <GripVertical size={16} className="text-muted-foreground flex-shrink-0 opacity-40" />
-              {item.image_url ? (
-                <div className="w-11 h-11 bg-muted rounded-lg bg-cover flex-shrink-0" style={{ backgroundImage: `url(${item.image_url})` }} />
-              ) : (
-                <div className="w-11 h-11 bg-muted rounded-lg flex items-center justify-center flex-shrink-0">
-                  <ImageIcon size={18} className="text-muted-foreground opacity-40" />
+              <div className="flex gap-3 items-center">
+                <GripVertical size={16} className="text-muted-foreground flex-shrink-0 opacity-40" />
+                {item.image_url ? (
+                  <div className="w-11 h-11 bg-muted rounded-lg bg-cover flex-shrink-0" style={{ backgroundImage: `url(${item.image_url})` }} />
+                ) : (
+                  <div className="w-11 h-11 bg-muted rounded-lg flex items-center justify-center flex-shrink-0">
+                    <ImageIcon size={18} className="text-muted-foreground opacity-40" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-white truncate">{item.title}</p>
+                  <p className="text-xs text-muted-foreground truncate">{item.excerpt || item.body}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">{item.visible ? "Visible" : "Oculta"}</p>
                 </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-white truncate">{item.title}</p>
-                <p className="text-xs text-muted-foreground truncate">{item.excerpt || item.body}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">{item.visible ? "Visible" : "Oculta"}</p>
+                <div className="flex gap-1 flex-shrink-0">
+                  <button
+                    onClick={() => setEditingNoteId(editingNoteId === item.id ? null : item.id)}
+                    className={`p-2 rounded-lg transition-colors ${editingNoteId === item.id ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-primary/10 hover:text-primary'}`}
+                  >
+                    <Pencil size={14} />
+                  </button>
+                  <button onClick={() => deleteNote.mutate(item.id)} className="p-2 text-destructive hover:bg-destructive/10 rounded-lg flex-shrink-0">
+                    <Trash size={15} />
+                  </button>
+                </div>
               </div>
-              <button onClick={() => deleteNote.mutate(item.id)} className="p-2 text-destructive hover:bg-destructive/10 rounded-lg flex-shrink-0">
-                <Trash size={15} />
-              </button>
+              {editingNoteId === item.id && (
+                <NoteItemEditor
+                  item={item}
+                  isSaving={updateNote.isPending}
+                  onSave={(updates) => updateNote.mutate({ id: item.id, updates }, { onSuccess: () => setEditingNoteId(null) })}
+                  onCancel={() => setEditingNoteId(null)}
+                />
+              )}
             </div>
           )) : (
             <p className="text-sm text-muted-foreground italic px-1">Sin notas todavía.</p>

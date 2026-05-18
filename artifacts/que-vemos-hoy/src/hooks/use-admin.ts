@@ -10,6 +10,11 @@ const TMDB_HEADERS = {
   accept: "application/json"
 };
 
+// Detecta si un texto usa solo caracteres latinos (incluye acentos, ñ, etc.)
+function isLatinScript(text: string): boolean {
+  return /^[\u0000-\u024F\u1E00-\u1EFF\s\d\W]+$/.test(text);
+}
+
 function filterTmdb(item: any) {
   if (item.media_type !== "movie" && item.media_type !== "tv") return false;
   if (item.media_type === "tv" && item.origin_country?.includes("IN")) return false;
@@ -18,12 +23,16 @@ function filterTmdb(item: any) {
 }
 
 function tmdbToContent(item: any, section: ContentSection): Omit<ContentRow, "id" | "created_at" | "updated_at"> {
+  const originalTitle = item.original_title || item.original_name || null;
+  const displayTitle = item.title || item.name;
+
   return {
     tmdb_id: item.id,
     media_type: item.media_type ?? "movie",
     section,
-    title: item.title || item.name,
-    original_title: item.original_title || item.original_name || null,
+    title: displayTitle,
+    // Solo guarda original_title si es alfabeto no latino (coreano, japonés, árabe, etc.)
+    original_title: originalTitle && !isLatinScript(originalTitle) ? originalTitle : null,
     overview: item.overview || null,
     poster_path: item.poster_path || null,
     backdrop_path: item.backdrop_path || null,
@@ -45,7 +54,7 @@ export function useTmdbSearch(query: string) {
     queryFn: async () => {
       if (!query || query.length < 3) return [];
       const res = await fetch(
-        `https://api.themoviedb.org/3/search/multi?query=${encodeURIComponent(query)}&language=en-US`,
+        `https://api.themoviedb.org/3/search/multi?query=${encodeURIComponent(query)}&language=es-419`,
         { headers: TMDB_HEADERS }
       );
       if (!res.ok) throw new Error("TMDB Search failed");
@@ -71,7 +80,7 @@ export function useSyncFromTmdb() {
     mutationFn: async () => {
       const existingIds = await getExistingIds();
       const res = await fetch(
-        "https://api.themoviedb.org/3/trending/all/week?language=en-US",
+        "https://api.themoviedb.org/3/trending/all/week?language=es-419",
         { headers: TMDB_HEADERS }
       );
       if (!res.ok) throw new Error("TMDB trending failed");
@@ -102,14 +111,12 @@ export function useSyncFromTmdb() {
   const syncUpcoming = useMutation({
     mutationFn: async () => {
       const existingIds = await getExistingIds();
-
-      // Fecha de hoy en formato YYYY-MM-DD
       const today = new Date().toISOString().split("T")[0];
 
       const [page1, page2, page3] = await Promise.all([
-        fetch("https://api.themoviedb.org/3/movie/upcoming?language=en-US&page=1&region=US", { headers: TMDB_HEADERS }).then(r => r.json()),
-        fetch("https://api.themoviedb.org/3/movie/upcoming?language=en-US&page=2&region=US", { headers: TMDB_HEADERS }).then(r => r.json()),
-        fetch("https://api.themoviedb.org/3/movie/upcoming?language=en-US&page=3&region=US", { headers: TMDB_HEADERS }).then(r => r.json()),
+        fetch("https://api.themoviedb.org/3/movie/upcoming?language=es-419&page=1&region=US", { headers: TMDB_HEADERS }).then(r => r.json()),
+        fetch("https://api.themoviedb.org/3/movie/upcoming?language=es-419&page=2&region=US", { headers: TMDB_HEADERS }).then(r => r.json()),
+        fetch("https://api.themoviedb.org/3/movie/upcoming?language=es-419&page=3&region=US", { headers: TMDB_HEADERS }).then(r => r.json()),
       ]);
 
       const all = [...(page1.results || []), ...(page2.results || []), ...(page3.results || [])];
@@ -119,9 +126,9 @@ export function useSyncFromTmdb() {
           !existingIds.has(item.id) &&
           item.poster_path &&
           item.release_date &&
-          item.release_date > today  // solo fechas futuras
+          item.release_date > today
         )
-        .sort((a: any, b: any) => a.release_date.localeCompare(b.release_date)) // más próximos primero
+        .sort((a: any, b: any) => a.release_date.localeCompare(b.release_date))
         .slice(0, 20)
         .map((item: any) => ({ ...tmdbToContent(item, "upcoming"), media_type: "movie" as const }));
 

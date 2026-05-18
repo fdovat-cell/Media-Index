@@ -10,7 +10,6 @@ const TMDB_HEADERS = {
   accept: "application/json"
 };
 
-// Detecta si un texto usa solo caracteres latinos (incluye acentos, ñ, etc.)
 function isLatinScript(text: string): boolean {
   return /^[\u0000-\u024F\u1E00-\u1EFF\s\d\W]+$/.test(text);
 }
@@ -31,7 +30,6 @@ function tmdbToContent(item: any, section: ContentSection): Omit<ContentRow, "id
     media_type: item.media_type ?? "movie",
     section,
     title: displayTitle,
-    // Solo guarda original_title si es alfabeto no latino (coreano, japonés, árabe, etc.)
     original_title: originalTitle && !isLatinScript(originalTitle) ? originalTitle : null,
     overview: item.overview || null,
     poster_path: item.poster_path || null,
@@ -79,6 +77,8 @@ export function useSyncFromTmdb() {
   const syncTrending = useMutation({
     mutationFn: async () => {
       const existingIds = await getExistingIds();
+      const today = new Date().toISOString().split("T")[0];
+
       const res = await fetch(
         "https://api.themoviedb.org/3/trending/all/week?language=es-419",
         { headers: TMDB_HEADERS }
@@ -87,12 +87,16 @@ export function useSyncFromTmdb() {
       const data = await res.json();
 
       const items = (data.results || [])
-        .filter((item: any) =>
-          filterTmdb(item) &&
-          !existingIds.has(item.id) &&
-          (item.vote_count ?? 0) >= 50 &&
-          (item.vote_average ?? 0) >= 6
-        )
+        .filter((item: any) => {
+          if (!filterTmdb(item)) return false;
+          if (existingIds.has(item.id)) return false;
+          if ((item.vote_count ?? 0) < 50) return false;
+          if ((item.vote_average ?? 0) < 6) return false;
+          // Excluir títulos con fecha de estreno futura — esos van a "upcoming"
+          const releaseDate = item.release_date || item.first_air_date || null;
+          if (releaseDate && releaseDate > today) return false;
+          return true;
+        })
         .slice(0, 12)
         .map((item: any) => tmdbToContent(item, "weekly"));
 

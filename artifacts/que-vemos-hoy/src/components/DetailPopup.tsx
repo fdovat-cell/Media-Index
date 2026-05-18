@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ContentRow, NoteRow } from "@/lib/database.types";
-import { X, Star, Send } from "lucide-react";
+import { X, Star, Send, ExternalLink } from "lucide-react";
 import { useComments, useMutateComments } from "@/hooks/use-data";
 import { format } from "date-fns";
 
@@ -9,25 +9,45 @@ type DetailPopupProps = {
   onClose: () => void;
 };
 
+function getPlatformUrl(platform: string, title: string): string {
+  const encoded = encodeURIComponent(title);
+  const p = platform.toLowerCase();
+  if (p.includes("netflix")) return `https://www.netflix.com/search?q=${encoded}`;
+  if (p.includes("hbo") || p.includes("max")) return `https://www.max.com/search?q=${encoded}`;
+  if (p.includes("prime") || p.includes("amazon")) return `https://www.primevideo.com/search?phrase=${encoded}`;
+  if (p.includes("disney")) return `https://www.disneyplus.com/search?q=${encoded}`;
+  if (p.includes("apple")) return `https://tv.apple.com/search?term=${encoded}`;
+  if (p.includes("paramount")) return `https://www.paramountplus.com/search/results/${encoded}`;
+  if (p.includes("mubi")) return `https://mubi.com/en/films`;
+  return "";
+}
+
+function getPlatformColor(platform: string): string {
+  const p = platform.toLowerCase();
+  if (p.includes("netflix")) return "bg-red-600 hover:bg-red-700";
+  if (p.includes("hbo") || p.includes("max")) return "bg-blue-700 hover:bg-blue-800";
+  if (p.includes("prime") || p.includes("amazon")) return "bg-sky-500 hover:bg-sky-600";
+  if (p.includes("disney")) return "bg-blue-600 hover:bg-blue-700";
+  if (p.includes("apple")) return "bg-gray-800 hover:bg-gray-900";
+  if (p.includes("paramount")) return "bg-indigo-600 hover:bg-indigo-700";
+  return "bg-primary hover:opacity-90";
+}
+
 export function DetailPopup({ item, onClose }: DetailPopupProps) {
-  // Maneja el botón back de Android: cierra el popup en vez de salir de la app
+  const scrollRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!item) return;
-    // Empuja un estado al historial para que el back no salga de la app
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
     window.history.pushState({ popup: true }, "");
-    const handlePopState = () => {
-      onClose();
-    };
+    const handlePopState = () => { onClose(); };
     window.addEventListener("popstate", handlePopState);
-    return () => {
-      window.removeEventListener("popstate", handlePopState);
-    };
+    return () => { window.removeEventListener("popstate", handlePopState); };
   }, [item, onClose]);
 
   if (!item) return null;
 
   const isContent = 'media_type' in item;
-
   const id = item.id;
   const contentId = isContent ? id : undefined;
   const noteId = !isContent ? id : undefined;
@@ -41,7 +61,6 @@ export function DetailPopup({ item, onClose }: DetailPopupProps) {
   const handleAddComment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!authorName.trim() || !commentBody.trim()) return;
-
     addComment.mutate({
       content_id: contentId || null,
       note_id: noteId || null,
@@ -56,7 +75,7 @@ export function DetailPopup({ item, onClose }: DetailPopupProps) {
   };
 
   return (
-    <div className="absolute inset-0 z-50 bg-background flex flex-col animate-in slide-in-from-bottom-full duration-300">
+    <div className="fixed inset-0 z-50 bg-background flex flex-col animate-in slide-in-from-bottom-full duration-300">
       <button
         onClick={onClose}
         className="absolute top-4 right-4 z-50 w-8 h-8 flex items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm"
@@ -64,7 +83,7 @@ export function DetailPopup({ item, onClose }: DetailPopupProps) {
         <X size={20} />
       </button>
 
-      <div className="flex-1 overflow-y-auto no-scrollbar">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto no-scrollbar">
         {isContent ? (
           <>
             <div className="w-full aspect-video relative">
@@ -80,7 +99,6 @@ export function DetailPopup({ item, onClose }: DetailPopupProps) {
             <div className="px-5 -mt-8 relative z-10 flex flex-col gap-4">
               <div>
                 <h1 className="text-3xl font-bold tracking-tight text-white">{item.title}</h1>
-                {/* Título original solo si es alfabeto no latino (ej: coreano, japonés) */}
                 {item.original_title && (
                   <p className="text-xs text-muted-foreground italic mt-1">{item.original_title}</p>
                 )}
@@ -94,12 +112,36 @@ export function DetailPopup({ item, onClose }: DetailPopupProps) {
                     {item.rating}
                   </span>
                 )}
-                {item.platforms && item.platforms.length > 0 && (
-                  <span className="px-2 py-0.5 rounded text-xs border border-border bg-card">
-                    {item.platforms.join(', ')}
-                  </span>
-                )}
               </div>
+
+              {/* Botones de plataformas */}
+              {item.platforms && item.platforms.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {item.platforms.map((platform) => {
+                    const url = getPlatformUrl(platform, item.title);
+                    const colorClass = getPlatformColor(platform);
+                    return url ? (
+                      <a
+                        key={platform}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-white text-sm font-semibold transition-colors ${colorClass}`}
+                      >
+                        <ExternalLink size={14} />
+                        Ver en {platform}
+                      </a>
+                    ) : (
+                      <span
+                        key={platform}
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-card border border-border text-sm font-semibold text-muted-foreground"
+                      >
+                        {platform}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
 
               {item.personal_review && (
                 <div className="p-4 rounded-lg bg-card border border-card-border mt-2">
@@ -110,9 +152,7 @@ export function DetailPopup({ item, onClose }: DetailPopupProps) {
               {item.overview && (
                 <div className="mt-2">
                   <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-2">Sinopsis</h3>
-                  <p className="text-sm text-gray-300 leading-relaxed">
-                    {item.overview}
-                  </p>
+                  <p className="text-sm text-gray-300 leading-relaxed">{item.overview}</p>
                 </div>
               )}
             </div>
@@ -131,7 +171,6 @@ export function DetailPopup({ item, onClose }: DetailPopupProps) {
 
             <div className={`px-5 relative z-10 flex flex-col gap-6 pb-6 ${item.image_url ? '-mt-8' : 'pt-16'}`}>
               <h1 className="text-3xl font-bold tracking-tight text-white leading-tight">{item.title}</h1>
-
               <div className="prose prose-invert max-w-none text-gray-300">
                 {item.body.split('\n').map((paragraph, i) => (
                   <p key={i} className="mb-4">{paragraph}</p>
@@ -141,7 +180,7 @@ export function DetailPopup({ item, onClose }: DetailPopupProps) {
           </>
         )}
 
-        {/* Comments Section */}
+        {/* Sección de comentarios */}
         <div className="mt-8 px-5 pb-12 border-t border-border pt-6">
           <h3 className="text-lg font-bold mb-4">Comentarios</h3>
 

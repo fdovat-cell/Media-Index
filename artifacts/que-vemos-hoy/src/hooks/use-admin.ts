@@ -21,7 +21,26 @@ function filterTmdb(item: any) {
   return true;
 }
 
-function tmdbToContent(item: any, section: ContentSection): Omit<ContentRow, "id" | "created_at" | "updated_at"> {
+async function fetchPlatforms(tmdbId: number, mediaType: "movie" | "tv"): Promise<string[]> {
+  try {
+    const res = await fetch(
+      `https://api.themoviedb.org/3/${mediaType}/${tmdbId}/watch/providers`,
+      { headers: TMDB_HEADERS }
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    const ar = data.results?.AR;
+    if (!ar) return [];
+    const flatrate = ar.flatrate || [];
+    const free = ar.free || [];
+    const providers = [...flatrate, ...free];
+    return providers.map((p: any) => p.provider_name).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function tmdbToContent(item: any, section: ContentSection, platforms: string[] = []): Omit<ContentRow, "id" | "created_at" | "updated_at"> {
   const originalTitle = item.original_title || item.original_name || null;
   const displayTitle = item.title || item.name;
 
@@ -37,7 +56,7 @@ function tmdbToContent(item: any, section: ContentSection): Omit<ContentRow, "id
     release_date: item.release_date || item.first_air_date || null,
     rating: item.vote_average ?? null,
     vote_count: item.vote_count ?? null,
-    platforms: [],
+    platforms,
     personal_review: null,
     visible: true,
     display_order: 0
@@ -96,7 +115,12 @@ export function useSyncFromTmdb() {
         return true;
       }).slice(0, 12);
 
-      const items = filtered.map((item: any) => tmdbToContent(item, "weekly"));
+      const items = await Promise.all(
+        filtered.map(async (item: any) => {
+          const platforms = await fetchPlatforms(item.id, item.media_type as "movie" | "tv");
+          return tmdbToContent(item, "weekly", platforms);
+        })
+      );
 
       if (items.length === 0) return 0;
       const { error } = await supabase.from("content").insert(items);
@@ -115,7 +139,6 @@ export function useSyncFromTmdb() {
       const existingIds = await getExistingIds();
       const today = new Date().toISOString().split("T")[0];
 
-      // Eliminar estrenos que ya pasaron
       await supabase.from("content").delete().eq("section", "upcoming").lt("release_date", today);
 
       const [page1, page2, page3] = await Promise.all([
@@ -136,10 +159,15 @@ export function useSyncFromTmdb() {
         .sort((a: any, b: any) => a.release_date.localeCompare(b.release_date))
         .slice(0, 20);
 
-      const items = filtered.map((item: any) => ({
-        ...tmdbToContent(item, "upcoming"),
-        media_type: "movie" as const
-      }));
+      const items = await Promise.all(
+        filtered.map(async (item: any) => {
+          const platforms = await fetchPlatforms(item.id, "movie");
+          return {
+            ...tmdbToContent(item, "upcoming", platforms),
+            media_type: "movie" as const
+          };
+        })
+      );
 
       if (items.length === 0) return 0;
       const { error } = await supabase.from("content").insert(items);

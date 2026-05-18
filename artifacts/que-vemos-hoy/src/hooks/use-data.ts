@@ -81,6 +81,45 @@ export function useComments(contentId?: string, noteId?: string) {
   });
 }
 
+export function useRatings(contentId?: string) {
+  return useQuery({
+    queryKey: ["ratings", contentId],
+    queryFn: async () => {
+      if (!contentId) return { average: 0, count: 0 };
+      const { data, error } = await supabase
+        .from("ratings")
+        .select("score")
+        .eq("content_id", contentId);
+      if (error) throw error;
+      if (!data || data.length === 0) return { average: 0, count: 0 };
+      const avg = data.reduce((sum, r) => sum + r.score, 0) / data.length;
+      return { average: Math.round(avg * 10) / 10, count: data.length };
+    },
+    enabled: !!contentId,
+  });
+}
+
+export function useMutateRatings() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const addRating = useMutation({
+    mutationFn: async ({ contentId, score }: { contentId: string; score: number }) => {
+      const { error } = await supabase.from("ratings").insert({ content_id: contentId, score });
+      if (error) throw error;
+    },
+    onSuccess: (_, { contentId }) => {
+      queryClient.invalidateQueries({ queryKey: ["ratings", contentId] });
+      toast({ title: "¡Gracias por tu valoración!" });
+    },
+    onError: () => {
+      toast({ title: "Error al guardar la valoración", variant: "destructive" });
+    }
+  });
+
+  return { addRating };
+}
+
 export function useMutateComments() {
   const queryClient = useQueryClient();
   const { toast } = useToast();

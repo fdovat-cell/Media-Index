@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { PhoneLayout } from "@/components/layout/PhoneLayout";
 import { useContent, useNotes } from "@/hooks/use-data";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,6 +18,20 @@ export default function Home() {
   const { data: notesContent, isLoading: isNotesLoading } = useNotes();
 
   const [selectedItem, setSelectedItem] = useState<ContentRow | NoteRow | null>(null);
+  const [platformFilter, setPlatformFilter] = useState<string | null>(null);
+
+  const allPlatforms = useMemo(() => {
+    const platforms = new Set<string>();
+    [...(weeklyContent || []), ...(classicContent || []), ...(upcomingContent || []), ...(heroContent || [])].forEach(item => {
+      item.platforms?.forEach(p => { if (p) platforms.add(p); });
+    });
+    return Array.from(platforms).sort();
+  }, [weeklyContent, classicContent, upcomingContent, heroContent]);
+
+  const filterByPlatform = (items: ContentRow[] | null | undefined) => {
+    if (!platformFilter || !items) return items;
+    return items.filter(item => item.platforms?.includes(platformFilter));
+  };
 
   return (
     <PhoneLayout>
@@ -80,10 +94,39 @@ export default function Home() {
           ) : null}
         </section>
 
+        {/* FILTRO POR PLATAFORMA */}
+        {allPlatforms.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto no-scrollbar px-4 py-4">
+            <button
+              onClick={() => setPlatformFilter(null)}
+              className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                platformFilter === null
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-border text-muted-foreground hover:text-white hover:border-white"
+              }`}
+            >
+              Todas
+            </button>
+            {allPlatforms.map(platform => (
+              <button
+                key={platform}
+                onClick={() => setPlatformFilter(platformFilter === platform ? null : platform)}
+                className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                  platformFilter === platform
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "border-border text-muted-foreground hover:text-white hover:border-white"
+                }`}
+              >
+                {platform}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* LO MEJOR ESTA SEMANA */}
         <ContentSection
           title="Lo mejor esta semana"
-          items={weeklyContent}
+          items={filterByPlatform(weeklyContent)}
           isLoading={isWeeklyLoading}
           onSelect={setSelectedItem}
         />
@@ -91,7 +134,7 @@ export default function Home() {
         {/* IMPERDIBLES */}
         <ContentSection
           title="Imperdibles"
-          items={classicContent}
+          items={filterByPlatform(classicContent)}
           isLoading={isClassicLoading}
           onSelect={setSelectedItem}
         />
@@ -135,7 +178,7 @@ export default function Home() {
         {/* PRÓXIMOS ESTRENOS */}
         <ContentSection
           title="Próximos estrenos"
-          items={upcomingContent}
+          items={filterByPlatform(upcomingContent)}
           isLoading={isUpcomingLoading}
           onSelect={setSelectedItem}
           showDate

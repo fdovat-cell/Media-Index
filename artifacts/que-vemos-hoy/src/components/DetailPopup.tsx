@@ -211,7 +211,7 @@ export function DetailPopup({ item, onClose }: DetailPopupProps) {
                     const url = getPlatformUrl(platform, (item as ContentRow).title);
                     const colorClass = getPlatformColor(platform);
                     return url ? (
-                      
+                      <a
                         key={platform}
                         href={url}
                         target="_blank"

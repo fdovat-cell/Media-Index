@@ -1,61 +1,14 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef } from "react";
 import { PhoneLayout } from "@/components/layout/PhoneLayout";
 import { useContent, useNotes } from "@/hooks/use-data";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ContentRow, NoteRow } from "@/lib/database.types";
 import { DetailPopup } from "@/components/DetailPopup";
-import { Star, FileText } from "lucide-react";
+import { Star, FileText, ChevronLeft, ChevronRight } from "lucide-react";
 
 const WA_NUMBER = "59896190002";
 const WA_TEXT = encodeURIComponent("Hola, vengo de quevemoshoy...");
 const WA_URL = `https://wa.me/${WA_NUMBER}?text=${WA_TEXT}`;
-
-function useHorizontalScroll() {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    let isDown = false;
-    let startX = 0;
-    let scrollLeft = 0;
-
-    const onMouseDown = (e: MouseEvent) => {
-      isDown = true;
-      el.style.cursor = "grabbing";
-      startX = e.pageX - el.offsetLeft;
-      scrollLeft = el.scrollLeft;
-    };
-    const onMouseLeave = () => {
-      isDown = false;
-      el.style.cursor = "grab";
-    };
-    const onMouseUp = () => {
-      isDown = false;
-      el.style.cursor = "grab";
-    };
-    const onMouseMove = (e: MouseEvent) => {
-      if (!isDown) return;
-      e.preventDefault();
-      const x = e.pageX - el.offsetLeft;
-      const walk = (x - startX) * 1.5;
-      el.scrollLeft = scrollLeft - walk;
-    };
-
-    el.style.cursor = "grab";
-    el.addEventListener("mousedown", onMouseDown);
-    el.addEventListener("mouseleave", onMouseLeave);
-    el.addEventListener("mouseup", onMouseUp);
-    el.addEventListener("mousemove", onMouseMove);
-
-    return () => {
-      el.removeEventListener("mousedown", onMouseDown);
-      el.removeEventListener("mouseleave", onMouseLeave);
-      el.removeEventListener("mouseup", onMouseUp);
-      el.removeEventListener("mousemove", onMouseMove);
-    };
-  }, []);
-  return ref;
-}
 
 export default function Home() {
   const { data: heroContent, isLoading: isHeroLoading } = useContent("hero");
@@ -67,7 +20,7 @@ export default function Home() {
   const [selectedItem, setSelectedItem] = useState<ContentRow | NoteRow | null>(null);
   const [platformFilter, setPlatformFilter] = useState<string | null>(null);
 
-  const notesScrollRef = useHorizontalScroll();
+  const notesScrollRef = useRef<HTMLDivElement>(null);
 
   const allPlatforms = useMemo(() => {
     const platforms = new Set<string>();
@@ -80,6 +33,10 @@ export default function Home() {
   const filterByPlatform = (items: ContentRow[] | null | undefined) => {
     if (!platformFilter || !items) return items;
     return items.filter(item => item.platforms?.includes(platformFilter));
+  };
+
+  const scroll = (ref: React.RefObject<HTMLDivElement>, dir: "left" | "right") => {
+    if (ref.current) ref.current.scrollBy({ left: dir === "right" ? 320 : -320, behavior: "smooth" });
   };
 
   return (
@@ -108,11 +65,9 @@ export default function Home() {
                 }}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
-
               <div className="absolute top-3 left-4">
                 <span className="text-[10px] font-bold tracking-widest uppercase text-primary">Recomendación del día</span>
               </div>
-
               <div className="absolute bottom-0 left-0 w-full px-4 pb-3 flex flex-col gap-1.5">
                 <h2 className="text-xl font-black text-white tracking-tight leading-tight uppercase line-clamp-1">
                   {heroContent[0].title}
@@ -192,6 +147,14 @@ export default function Home() {
         <section className="py-6 px-4">
           <div className="flex justify-between items-center mb-4 pr-4">
             <h2 className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Qué leemos hoy</h2>
+            <div className="flex gap-1">
+              <button onClick={() => scroll(notesScrollRef, "left")} className="p-1 rounded-full border border-border text-muted-foreground hover:text-white hover:border-white transition-colors">
+                <ChevronLeft size={14} />
+              </button>
+              <button onClick={() => scroll(notesScrollRef, "right")} className="p-1 rounded-full border border-border text-muted-foreground hover:text-white hover:border-white transition-colors">
+                <ChevronRight size={14} />
+              </button>
+            </div>
           </div>
           <div ref={notesScrollRef} className="flex gap-4 overflow-x-auto no-scrollbar pb-4 snap-x">
             {isNotesLoading ? (
@@ -265,12 +228,24 @@ function ContentSection({
   onSelect: (item: ContentRow) => void;
   showDate?: boolean;
 }) {
-  const scrollRef = useHorizontalScroll();
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const scroll = (dir: "left" | "right") => {
+    if (scrollRef.current) scrollRef.current.scrollBy({ left: dir === "right" ? 320 : -320, behavior: "smooth" });
+  };
 
   return (
     <section className="py-6 pl-4">
       <div className="flex justify-between items-center mb-4 pr-4">
         <h2 className="text-xs font-bold tracking-widest uppercase text-muted-foreground">{title}</h2>
+        <div className="flex gap-1">
+          <button onClick={() => scroll("left")} className="p-1 rounded-full border border-border text-muted-foreground hover:text-white hover:border-white transition-colors">
+            <ChevronLeft size={14} />
+          </button>
+          <button onClick={() => scroll("right")} className="p-1 rounded-full border border-border text-muted-foreground hover:text-white hover:border-white transition-colors">
+            <ChevronRight size={14} />
+          </button>
+        </div>
       </div>
       <div ref={scrollRef} className="flex gap-4 overflow-x-auto no-scrollbar pb-4 snap-x pr-4">
         {isLoading ? (

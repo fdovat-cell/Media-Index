@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { PhoneLayout } from "@/components/layout/PhoneLayout";
 import { useContent, useNotes } from "@/hooks/use-data";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,6 +10,22 @@ const WA_NUMBER = "59896190002";
 const WA_TEXT = encodeURIComponent("Hola, vengo de quevemoshoy...");
 const WA_URL = `https://wa.me/${WA_NUMBER}?text=${WA_TEXT}`;
 
+function useHorizontalScroll() {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
+      e.preventDefault();
+      el.scrollLeft += e.deltaY;
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+  return ref;
+}
+
 export default function Home() {
   const { data: heroContent, isLoading: isHeroLoading } = useContent("hero");
   const { data: weeklyContent, isLoading: isWeeklyLoading } = useContent("weekly");
@@ -19,6 +35,8 @@ export default function Home() {
 
   const [selectedItem, setSelectedItem] = useState<ContentRow | NoteRow | null>(null);
   const [platformFilter, setPlatformFilter] = useState<string | null>(null);
+
+  const notesScrollRef = useHorizontalScroll();
 
   const allPlatforms = useMemo(() => {
     const platforms = new Set<string>();
@@ -144,7 +162,7 @@ export default function Home() {
           <div className="flex justify-between items-center mb-4 pr-4">
             <h2 className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Qué leemos hoy</h2>
           </div>
-          <div className="flex gap-4 overflow-x-auto no-scrollbar pb-4 snap-x">
+          <div ref={notesScrollRef} className="flex gap-4 overflow-x-auto no-scrollbar pb-4 snap-x">
             {isNotesLoading ? (
               Array(3).fill(0).map((_, i) => (
                 <Skeleton key={i} className="min-w-[280px] h-[160px] rounded-lg bg-card snap-start" />
@@ -186,7 +204,7 @@ export default function Home() {
 
         {/* WHATSAPP BUTTON */}
         <div className="flex justify-center py-6">
-          <a
+          
             href={WA_URL}
             target="_blank"
             rel="noopener noreferrer"
@@ -216,12 +234,14 @@ function ContentSection({
   onSelect: (item: ContentRow) => void;
   showDate?: boolean;
 }) {
+  const scrollRef = useHorizontalScroll();
+
   return (
     <section className="py-6 pl-4">
       <div className="flex justify-between items-center mb-4 pr-4">
         <h2 className="text-xs font-bold tracking-widest uppercase text-muted-foreground">{title}</h2>
       </div>
-      <div className="flex gap-4 overflow-x-auto no-scrollbar pb-4 snap-x pr-4">
+      <div ref={scrollRef} className="flex gap-4 overflow-x-auto no-scrollbar pb-4 snap-x pr-4">
         {isLoading ? (
           Array(4).fill(0).map((_, i) => (
             <Skeleton key={i} className="min-w-[140px] aspect-[2/3] rounded-lg bg-card snap-start" />

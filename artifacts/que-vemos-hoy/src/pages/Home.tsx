@@ -198,7 +198,7 @@ export default function Home() {
 
         {/* WHATSAPP BUTTON */}
         <div className="flex justify-center py-6">
-          
+          <a
             href={WA_URL}
             target="_blank"
             rel="noopener noreferrer"

@@ -235,7 +235,7 @@ function ContentSection({
   };
 
   return (
-    <section className="py-6 pl-4">
+    <section className="py-6 px-4">
       <div className="flex justify-between items-center mb-4 pr-4">
         <h2 className="text-xs font-bold tracking-widest uppercase text-muted-foreground">{title}</h2>
         <div className="flex gap-1">

@@ -172,4 +172,33 @@ export function useLocalSearch(query: string) {
     enabled: query.length >= 2,
   });
 }
+export type SuggestionRow = {
+  id: string;
+  tmdb_id: number;
+  media_type: "movie" | "tv";
+  title: string;
+  original_title: string | null;
+  poster_path: string | null;
+  release_date: string | null;
+  suggested_by: string | null;
+  status: "pending" | "approved" | "rejected";
+  display_order: number;
+  created_at: string;
+};
+
+export function useApprovedSuggestions() {
+  return useQuery({
+    queryKey: ["suggestions", "approved"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("suggestions")
+        .select("*")
+        .eq("status", "approved")
+        .order("display_order", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as SuggestionRow[];
+    },
+  });
+}
+
 

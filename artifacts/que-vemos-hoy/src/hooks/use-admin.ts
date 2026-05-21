@@ -63,7 +63,7 @@ function tmdbToContent(item: any, section: ContentSection, platforms: string[] =
   };
 }
 
-// Search
+// ─── Search ───────────────────────────────────────────────────────────────────
 
 export function useTmdbSearch(query: string) {
   return useQuery({
@@ -82,7 +82,7 @@ export function useTmdbSearch(query: string) {
   });
 }
 
-// Sync from TMDB
+// ─── Sync from TMDB ───────────────────────────────────────────────────────────
 
 export function useSyncFromTmdb() {
   const queryClient = useQueryClient();
@@ -184,7 +184,7 @@ export function useSyncFromTmdb() {
   return { syncTrending, syncUpcoming };
 }
 
-// Content mutations
+// ─── Content mutations ────────────────────────────────────────────────────────
 
 export function useMutateContent() {
   const queryClient = useQueryClient();
@@ -231,7 +231,7 @@ export function useMutateContent() {
   return { addContent, updateContent, deleteContent };
 }
 
-// Notes mutations
+// ─── Notes mutations ──────────────────────────────────────────────────────────
 
 export function useMutateNotes() {
   const queryClient = useQueryClient();
@@ -278,7 +278,7 @@ export function useMutateNotes() {
   return { addNote, updateNote, deleteNote };
 }
 
-// Batch order update — sin race conditions
+// ─── Batch order update ───────────────────────────────────────────────────────
 
 export function useBatchUpdateOrder() {
   const queryClient = useQueryClient();
@@ -299,5 +299,83 @@ export function useBatchUpdateOrder() {
       toast({ title: "Orden guardado" });
     },
     onError: (e: Error) => toast({ title: "Error al guardar orden", description: e.message, variant: "destructive" })
+  });
+}
+
+// ─── Suggestions — public submit ──────────────────────────────────────────────
+
+export function useSubmitSuggestion() {
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (suggestion: {
+      tmdb_id: number;
+      media_type: "movie" | "tv";
+      title: string;
+      original_title: string | null;
+      poster_path: string | null;
+      release_date: string | null;
+      suggested_by: string | null;
+    }) => {
+      const { error } = await supabase.from("suggestions").insert({
+        ...suggestion,
+        status: "pending",
+        display_order: 0,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => toast({ title: "¡Gracias! Tu sugerencia fue enviada." }),
+    onError: (e: Error) => toast({ title: "Error al enviar", description: e.message, variant: "destructive" }),
+  });
+}
+
+// ─── Suggestions — admin ──────────────────────────────────────────────────────
+
+export function usePendingSuggestions() {
+  return useQuery({
+    queryKey: ["suggestions", "pending"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("suggestions")
+        .select("*")
+        .eq("status", "pending")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
+export function useApproveSuggestion() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("suggestions").update({ status: "approved" }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["suggestions"] });
+      toast({ title: "Sugerencia aprobada" });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+}
+
+export function useRejectSuggestion() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("suggestions").update({ status: "rejected" }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["suggestions"] });
+      toast({ title: "Sugerencia rechazada" });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 }

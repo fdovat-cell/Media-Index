@@ -3,8 +3,8 @@ import { PhoneLayout } from "@/components/layout/PhoneLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { useAllContent, useNotes } from "@/hooks/use-data";
-import { useMutateContent, useTmdbSearch, useMutateNotes, useSyncFromTmdb, useBatchUpdateOrder } from "@/hooks/use-admin";
-import { Trash, LogOut, Plus, Search, RefreshCw, ImageIcon, GripVertical, Pencil, Check, Eye, EyeOff } from "lucide-react";
+import { useMutateContent, useTmdbSearch, useMutateNotes, useSyncFromTmdb, useBatchUpdateOrder, usePendingSuggestions, useApproveSuggestion, useRejectSuggestion } from "@/hooks/use-admin";
+import { Trash, LogOut, Plus, Search, RefreshCw, ImageIcon, GripVertical, Pencil, Check, Eye, EyeOff, ThumbsUp, ThumbsDown } from "lucide-react";
 import { ContentRow, NoteRow } from "@/lib/database.types";
 
 export default function Admin() {
@@ -179,6 +179,9 @@ function AdminContent() {
   const { addNote, deleteNote, updateNote } = useMutateNotes();
   const { syncTrending, syncUpcoming } = useSyncFromTmdb();
   const batchUpdateOrder = useBatchUpdateOrder();
+  const { data: pendingSuggestions } = usePendingSuggestions();
+  const approveSuggestion = useApproveSuggestion();
+  const rejectSuggestion = useRejectSuggestion();
 
   const [searchQuery, setSearchQuery] = useState("");
   const { data: searchResults, isLoading: isSearching } = useTmdbSearch(searchQuery);
@@ -221,20 +224,12 @@ function AdminContent() {
   };
 
   const contentDrag = useDragReorder(content ?? [], (ordered) => {
-    const changes = ordered.map((item, idx) => ({
-      id: item.id,
-      display_order: idx,
-      table: "content" as const
-    }));
+    const changes = ordered.map((item, idx) => ({ id: item.id, display_order: idx, table: "content" as const }));
     batchUpdateOrder.mutate(changes);
   });
 
   const notesDrag = useDragReorder(notes ?? [], (ordered) => {
-    const changes = ordered.map((item, idx) => ({
-      id: item.id,
-      display_order: idx,
-      table: "notes" as const
-    }));
+    const changes = ordered.map((item, idx) => ({ id: item.id, display_order: idx, table: "notes" as const }));
     batchUpdateOrder.mutate(changes);
   });
 
@@ -275,7 +270,51 @@ function AdminContent() {
         </Card>
       </section>
 
-      {/* 2. AGREGAR MANUAL */}
+      {/* 2. SUGERENCIAS PENDIENTES */}
+      {pendingSuggestions && pendingSuggestions.length > 0 && (
+        <section>
+          <SectionLabel>Sugerencias pendientes ({pendingSuggestions.length})</SectionLabel>
+          <div className="flex flex-col gap-2">
+            {pendingSuggestions.map((item: any) => (
+              <div key={item.id} className="flex gap-3 items-center p-3 bg-card border border-amber-500/30 rounded-xl">
+                <div
+                  className="w-10 h-14 bg-muted rounded-lg bg-cover bg-center flex-shrink-0"
+                  style={{ backgroundImage: item.poster_path ? `url(https://image.tmdb.org/t/p/w200${item.poster_path})` : "none" }}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-white truncate">{item.title}</p>
+                  <p className="text-xs text-muted-foreground capitalize">
+                    {item.media_type === "movie" ? "Película" : "Serie"} · {(item.release_date || "").substring(0, 4)}
+                  </p>
+                  {item.suggested_by && (
+                    <p className="text-[11px] text-amber-400/70 mt-0.5">por {item.suggested_by}</p>
+                  )}
+                </div>
+                <div className="flex gap-1.5 flex-shrink-0">
+                  <button
+                    onClick={() => approveSuggestion.mutate(item.id)}
+                    disabled={approveSuggestion.isPending}
+                    title="Aprobar"
+                    className="p-2 bg-primary/20 text-primary rounded-lg hover:bg-primary hover:text-primary-foreground transition-colors disabled:opacity-50"
+                  >
+                    <ThumbsUp size={14} />
+                  </button>
+                  <button
+                    onClick={() => rejectSuggestion.mutate(item.id)}
+                    disabled={rejectSuggestion.isPending}
+                    title="Rechazar"
+                    className="p-2 text-destructive hover:bg-destructive/10 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    <ThumbsDown size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* 3. AGREGAR MANUAL */}
       <section>
         <SectionLabel>Agregar película o serie</SectionLabel>
         <Card>
@@ -334,7 +373,7 @@ function AdminContent() {
         </Card>
       </section>
 
-      {/* 3. AGREGAR NOTA */}
+      {/* 4. AGREGAR NOTA */}
       <section>
         <SectionLabel>Agregar nota / lectura</SectionLabel>
         <Card>
@@ -358,7 +397,7 @@ function AdminContent() {
         </Card>
       </section>
 
-      {/* 4. CONTENIDO */}
+      {/* 5. CONTENIDO */}
       <section>
         <div className="flex items-center justify-between mb-3">
           <SectionLabel>Contenido guardado ({content?.length ?? 0})</SectionLabel>
@@ -370,14 +409,7 @@ function AdminContent() {
         </div>
         <div className="flex flex-col gap-2">
           {contentDrag.activeList.length > 0 ? contentDrag.activeList.map((item: ContentRow) => (
-            <div
-              key={item.id}
-              draggable={editingContentId !== item.id}
-              onDragStart={() => editingContentId !== item.id && contentDrag.onDragStart(item.id)}
-              onDragOver={e => contentDrag.onDragOver(e, item.id)}
-              onDragEnd={contentDrag.onDragEnd}
-              className="flex flex-col p-3 bg-card rounded-xl border border-border"
-            >
+            <div key={item.id} draggable={editingContentId !== item.id} onDragStart={() => editingContentId !== item.id && contentDrag.onDragStart(item.id)} onDragOver={e => contentDrag.onDragOver(e, item.id)} onDragEnd={contentDrag.onDragEnd} className="flex flex-col p-3 bg-card rounded-xl border border-border">
               <div className="flex gap-3 items-center">
                 <GripVertical size={16} className="text-muted-foreground flex-shrink-0 opacity-40" />
                 <div className="w-11 h-14 bg-muted rounded-lg bg-cover flex-shrink-0" style={{ backgroundImage: item.poster_path ? `url(https://image.tmdb.org/t/p/w200${item.poster_path})` : "none" }} />
@@ -390,17 +422,10 @@ function AdminContent() {
                   {item.personal_review && <p className="text-[11px] text-gray-500 italic truncate mt-0.5">"{item.personal_review}"</p>}
                 </div>
                 <div className="flex gap-1 flex-shrink-0">
-                  <button
-                    onClick={() => updateContent.mutate({ id: item.id, updates: { visible: !item.visible } })}
-                    title={item.visible ? "Ocultar" : "Mostrar"}
-                    className={`p-2 rounded-lg transition-colors ${item.visible ? 'text-muted-foreground hover:text-white' : 'text-amber-500 hover:text-amber-400'}`}
-                  >
+                  <button onClick={() => updateContent.mutate({ id: item.id, updates: { visible: !item.visible } })} title={item.visible ? "Ocultar" : "Mostrar"} className={`p-2 rounded-lg transition-colors ${item.visible ? 'text-muted-foreground hover:text-white' : 'text-amber-500 hover:text-amber-400'}`}>
                     {item.visible ? <Eye size={14} /> : <EyeOff size={14} />}
                   </button>
-                  <button
-                    onClick={() => setEditingContentId(editingContentId === item.id ? null : item.id)}
-                    className={`p-2 rounded-lg transition-colors ${editingContentId === item.id ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-primary/10 hover:text-primary'}`}
-                  >
+                  <button onClick={() => setEditingContentId(editingContentId === item.id ? null : item.id)} className={`p-2 rounded-lg transition-colors ${editingContentId === item.id ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-primary/10 hover:text-primary'}`}>
                     <Pencil size={14} />
                   </button>
                   <button onClick={() => deleteContent.mutate(item.id)} className="p-2 text-destructive hover:bg-destructive/10 rounded-lg">
@@ -409,12 +434,7 @@ function AdminContent() {
                 </div>
               </div>
               {editingContentId === item.id && (
-                <ContentItemEditor
-                  item={item}
-                  isSaving={updateContent.isPending}
-                  onSave={(updates) => updateContent.mutate({ id: item.id, updates }, { onSuccess: () => setEditingContentId(null) })}
-                  onCancel={() => setEditingContentId(null)}
-                />
+                <ContentItemEditor item={item} isSaving={updateContent.isPending} onSave={(updates) => updateContent.mutate({ id: item.id, updates }, { onSuccess: () => setEditingContentId(null) })} onCancel={() => setEditingContentId(null)} />
               )}
             </div>
           )) : (
@@ -423,7 +443,7 @@ function AdminContent() {
         </div>
       </section>
 
-      {/* 5. NOTAS */}
+      {/* 6. NOTAS */}
       <section>
         <div className="flex items-center justify-between mb-3">
           <SectionLabel>Notas publicadas ({notes?.length ?? 0})</SectionLabel>
@@ -435,14 +455,7 @@ function AdminContent() {
         </div>
         <div className="flex flex-col gap-2">
           {notesDrag.activeList.length > 0 ? notesDrag.activeList.map((item: NoteRow) => (
-            <div
-              key={item.id}
-              draggable={editingNoteId !== item.id}
-              onDragStart={() => editingNoteId !== item.id && notesDrag.onDragStart(item.id)}
-              onDragOver={e => notesDrag.onDragOver(e, item.id)}
-              onDragEnd={notesDrag.onDragEnd}
-              className="flex flex-col p-3 bg-card rounded-xl border border-border"
-            >
+            <div key={item.id} draggable={editingNoteId !== item.id} onDragStart={() => editingNoteId !== item.id && notesDrag.onDragStart(item.id)} onDragOver={e => notesDrag.onDragOver(e, item.id)} onDragEnd={notesDrag.onDragEnd} className="flex flex-col p-3 bg-card rounded-xl border border-border">
               <div className="flex gap-3 items-center">
                 <GripVertical size={16} className="text-muted-foreground flex-shrink-0 opacity-40" />
                 {item.image_url ? (
@@ -457,17 +470,10 @@ function AdminContent() {
                   <p className="text-xs text-muted-foreground truncate">{item.excerpt || item.body}</p>
                 </div>
                 <div className="flex gap-1 flex-shrink-0">
-                  <button
-                    onClick={() => updateNote.mutate({ id: item.id, updates: { visible: !item.visible } })}
-                    title={item.visible ? "Ocultar" : "Mostrar"}
-                    className={`p-2 rounded-lg transition-colors ${item.visible ? 'text-muted-foreground hover:text-white' : 'text-amber-500 hover:text-amber-400'}`}
-                  >
+                  <button onClick={() => updateNote.mutate({ id: item.id, updates: { visible: !item.visible } })} title={item.visible ? "Ocultar" : "Mostrar"} className={`p-2 rounded-lg transition-colors ${item.visible ? 'text-muted-foreground hover:text-white' : 'text-amber-500 hover:text-amber-400'}`}>
                     {item.visible ? <Eye size={14} /> : <EyeOff size={14} />}
                   </button>
-                  <button
-                    onClick={() => setEditingNoteId(editingNoteId === item.id ? null : item.id)}
-                    className={`p-2 rounded-lg transition-colors ${editingNoteId === item.id ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-primary/10 hover:text-primary'}`}
-                  >
+                  <button onClick={() => setEditingNoteId(editingNoteId === item.id ? null : item.id)} className={`p-2 rounded-lg transition-colors ${editingNoteId === item.id ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-primary/10 hover:text-primary'}`}>
                     <Pencil size={14} />
                   </button>
                   <button onClick={() => deleteNote.mutate(item.id)} className="p-2 text-destructive hover:bg-destructive/10 rounded-lg flex-shrink-0">
@@ -476,12 +482,7 @@ function AdminContent() {
                 </div>
               </div>
               {editingNoteId === item.id && (
-                <NoteItemEditor
-                  item={item}
-                  isSaving={updateNote.isPending}
-                  onSave={(updates) => updateNote.mutate({ id: item.id, updates }, { onSuccess: () => setEditingNoteId(null) })}
-                  onCancel={() => setEditingNoteId(null)}
-                />
+                <NoteItemEditor item={item} isSaving={updateNote.isPending} onSave={(updates) => updateNote.mutate({ id: item.id, updates }, { onSuccess: () => setEditingNoteId(null) })} onCancel={() => setEditingNoteId(null)} />
               )}
             </div>
           )) : (

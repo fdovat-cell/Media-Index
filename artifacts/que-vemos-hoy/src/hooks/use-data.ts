@@ -141,3 +141,35 @@ export function useMutateComments() {
 
   return { addComment };
 }
+export function useLocalSearch(query: string) {
+  return useQuery({
+    queryKey: ["local-search", query],
+    queryFn: async () => {
+      if (!query || query.length < 2) return { content: [], notes: [] };
+
+      const [contentRes, notesRes] = await Promise.all([
+        supabase
+          .from("content")
+          .select("*")
+          .eq("visible", true)
+          .ilike("title", `%${query}%`)
+          .order("display_order", { ascending: true })
+          .limit(8),
+        supabase
+          .from("notes")
+          .select("*")
+          .eq("visible", true)
+          .ilike("title", `%${query}%`)
+          .order("display_order", { ascending: true })
+          .limit(4),
+      ]);
+
+      return {
+        content: (contentRes.data ?? []) as ContentRow[],
+        notes: (notesRes.data ?? []) as NoteRow[],
+      };
+    },
+    enabled: query.length >= 2,
+  });
+}
+

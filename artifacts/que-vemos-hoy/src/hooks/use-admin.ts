@@ -63,7 +63,7 @@ function tmdbToContent(item: any, section: ContentSection, platforms: string[] =
   };
 }
 
-// ── Search ────────────────────────────────────────────────────────────────────
+// ?? Search ????????????????????????????????????????????????????????????????????
 
 export function useTmdbSearch(query: string) {
   return useQuery({
@@ -82,7 +82,7 @@ export function useTmdbSearch(query: string) {
   });
 }
 
-// ── Sync from TMDB ────────────────────────────────────────────────────────────
+// ?? Sync from TMDB ????????????????????????????????????????????????????????????
 
 export function useSyncFromTmdb() {
   const queryClient = useQueryClient();
@@ -184,7 +184,7 @@ export function useSyncFromTmdb() {
   return { syncTrending, syncUpcoming };
 }
 
-// ── Content mutations ─────────────────────────────────────────────────────────
+// ?? Content mutations ?????????????????????????????????????????????????????????
 
 export function useMutateContent() {
   const queryClient = useQueryClient();
@@ -228,26 +228,10 @@ export function useMutateContent() {
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" })
   });
 
-  // ── Reorder (una sola mutación que espera todas las escrituras) ──
-  const reorderContent = useMutation({
-    mutationFn: async (ordered: ContentRow[]) => {
-      await Promise.all(
-        ordered.map((item, idx) =>
-          supabase.from("content").update({ display_order: idx }).eq("id", item.id)
-        )
-      );
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["content"] });
-      toast({ title: "Orden guardado" });
-    },
-    onError: (e: Error) => toast({ title: "Error al guardar orden", description: e.message, variant: "destructive" })
-  });
-
-  return { addContent, updateContent, deleteContent, reorderContent };
+  return { addContent, updateContent, deleteContent };
 }
 
-// ── Notes mutations ───────────────────────────────────────────────────────────
+// ?? Notes mutations ???????????????????????????????????????????????????????????
 
 export function useMutateNotes() {
   const queryClient = useQueryClient();
@@ -291,21 +275,5 @@ export function useMutateNotes() {
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" })
   });
 
-  // ── Reorder (una sola mutación que espera todas las escrituras) ──
-  const reorderNotes = useMutation({
-    mutationFn: async (ordered: NoteRow[]) => {
-      await Promise.all(
-        ordered.map((item, idx) =>
-          supabase.from("notes").update({ display_order: idx }).eq("id", item.id)
-        )
-      );
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notes"] });
-      toast({ title: "Orden guardado" });
-    },
-    onError: (e: Error) => toast({ title: "Error al guardar orden", description: e.message, variant: "destructive" })
-  });
-
-  return { addNote, updateNote, deleteNote, reorderNotes };
+  return { addNote, updateNote, deleteNote };
 }

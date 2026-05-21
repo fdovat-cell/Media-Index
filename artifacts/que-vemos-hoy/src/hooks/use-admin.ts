@@ -63,7 +63,7 @@ function tmdbToContent(item: any, section: ContentSection, platforms: string[] =
   };
 }
 
-// 🔍 Search ────────────────────────────────────────────────────────────────────
+// Search
 
 export function useTmdbSearch(query: string) {
   return useQuery({
@@ -82,7 +82,7 @@ export function useTmdbSearch(query: string) {
   });
 }
 
-// 🔄 Sync from TMDB ────────────────────────────────────────────────────────────
+// Sync from TMDB
 
 export function useSyncFromTmdb() {
   const queryClient = useQueryClient();
@@ -184,7 +184,7 @@ export function useSyncFromTmdb() {
   return { syncTrending, syncUpcoming };
 }
 
-// ✏️ Content mutations ────────────────────────────────────────────────────────
+// Content mutations
 
 export function useMutateContent() {
   const queryClient = useQueryClient();
@@ -231,7 +231,7 @@ export function useMutateContent() {
   return { addContent, updateContent, deleteContent };
 }
 
-// 📝 Notes mutations ──────────────────────────────────────────────────────────
+// Notes mutations
 
 export function useMutateNotes() {
   const queryClient = useQueryClient();
@@ -278,7 +278,7 @@ export function useMutateNotes() {
   return { addNote, updateNote, deleteNote };
 }
 
-// 🔀 Batch order update (sin race conditions) ─────────────────────────────────
+// Batch order update — sin race conditions
 
 export function useBatchUpdateOrder() {
   const queryClient = useQueryClient();

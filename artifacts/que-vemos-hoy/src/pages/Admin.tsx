@@ -3,7 +3,7 @@ import { PhoneLayout } from "@/components/layout/PhoneLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { useAllContent, useNotes } from "@/hooks/use-data";
-import { useMutateContent, useTmdbSearch, useMutateNotes, useSyncFromTmdb } from "@/hooks/use-admin";
+import { useMutateContent, useTmdbSearch, useMutateNotes, useSyncFromTmdb, useBatchUpdateOrder } from "@/hooks/use-admin";
 import { Trash, LogOut, Plus, Search, RefreshCw, ImageIcon, GripVertical, Pencil, Check, Eye, EyeOff } from "lucide-react";
 import { ContentRow, NoteRow } from "@/lib/database.types";
 
@@ -178,6 +178,7 @@ function AdminContent() {
   const { deleteContent, addContent, updateContent } = useMutateContent();
   const { addNote, deleteNote, updateNote } = useMutateNotes();
   const { syncTrending, syncUpcoming } = useSyncFromTmdb();
+  const batchUpdateOrder = useBatchUpdateOrder();
 
   const [searchQuery, setSearchQuery] = useState("");
   const { data: searchResults, isLoading: isSearching } = useTmdbSearch(searchQuery);
@@ -220,10 +221,21 @@ function AdminContent() {
   };
 
   const contentDrag = useDragReorder(content ?? [], (ordered) => {
-    ordered.forEach((item, idx) => { if (item.display_order !== idx) updateContent.mutate({ id: item.id, updates: { display_order: idx } }); });
+    const changes = ordered.map((item, idx) => ({
+      id: item.id,
+      display_order: idx,
+      table: "content" as const
+    }));
+    batchUpdateOrder.mutate(changes);
   });
+
   const notesDrag = useDragReorder(notes ?? [], (ordered) => {
-    ordered.forEach((item, idx) => { if (item.display_order !== idx) updateNote.mutate({ id: item.id, updates: { display_order: idx } }); });
+    const changes = ordered.map((item, idx) => ({
+      id: item.id,
+      display_order: idx,
+      table: "notes" as const
+    }));
+    batchUpdateOrder.mutate(changes);
   });
 
   const weeklyCount = content?.filter(c => c.section === "weekly").length ?? 0;
@@ -232,7 +244,7 @@ function AdminContent() {
   return (
     <div className="flex flex-col gap-6 p-4 pb-12">
 
-      {/* ── 1. SYNC ── */}
+      {/* 1. SYNC */}
       <section>
         <SectionLabel>Actualizar desde TMDB</SectionLabel>
         <Card>
@@ -263,7 +275,7 @@ function AdminContent() {
         </Card>
       </section>
 
-      {/* ── 2. AGREGAR MANUAL ── */}
+      {/* 2. AGREGAR MANUAL */}
       <section>
         <SectionLabel>Agregar película o serie</SectionLabel>
         <Card>
@@ -322,7 +334,7 @@ function AdminContent() {
         </Card>
       </section>
 
-      {/* ── 3. AGREGAR NOTA ── */}
+      {/* 3. AGREGAR NOTA */}
       <section>
         <SectionLabel>Agregar nota / lectura</SectionLabel>
         <Card>
@@ -346,7 +358,7 @@ function AdminContent() {
         </Card>
       </section>
 
-      {/* ── 4. CONTENIDO ── */}
+      {/* 4. CONTENIDO */}
       <section>
         <div className="flex items-center justify-between mb-3">
           <SectionLabel>Contenido guardado ({content?.length ?? 0})</SectionLabel>
@@ -411,7 +423,7 @@ function AdminContent() {
         </div>
       </section>
 
-      {/* ── 5. NOTAS ── */}
+      {/* 5. NOTAS */}
       <section>
         <div className="flex items-center justify-between mb-3">
           <SectionLabel>Notas publicadas ({notes?.length ?? 0})</SectionLabel>

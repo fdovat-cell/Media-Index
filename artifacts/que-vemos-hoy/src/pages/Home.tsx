@@ -1,10 +1,11 @@
 import { useState, useMemo, useRef } from "react";
 import { PhoneLayout } from "@/components/layout/PhoneLayout";
-import { useContent, useNotes } from "@/hooks/use-data";
+import { useContent, useNotes, useApprovedSuggestions, SuggestionRow } from "@/hooks/use-data";
+import { useTmdbSearch, useSubmitSuggestion } from "@/hooks/use-admin";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ContentRow, NoteRow } from "@/lib/database.types";
 import { DetailPopup } from "@/components/DetailPopup";
-import { Star, FileText, ChevronLeft, ChevronRight } from "lucide-react";
+import { Star, FileText, ChevronLeft, ChevronRight, Search, X, Check } from "lucide-react";
 
 const WA_NUMBER = "59896190002";
 const WA_TEXT = encodeURIComponent("Hola, vengo de quevemoshoy...");
@@ -196,6 +197,9 @@ export default function Home() {
           showDate
         />
 
+        {/* RECOMENDANOS TU IMPERDIBLE */}
+        <SuggestSection />
+
         {/* WHATSAPP BUTTON */}
         <div className="flex justify-center py-6">
           <a
@@ -205,7 +209,7 @@ export default function Home() {
             className="flex items-center gap-2 text-[11px] text-muted-foreground hover:text-white transition-colors opacity-50 hover:opacity-100"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
             </svg>
             Contacto
           </a>
@@ -218,6 +222,197 @@ export default function Home() {
     </PhoneLayout>
   );
 }
+
+// ─── Suggest Section ──────────────────────────────────────────────────────────
+
+function SuggestSection() {
+  const [query, setQuery] = useState("");
+  const [pendingItem, setPendingItem] = useState<any>(null);
+  const [suggesterName, setSuggesterName] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const { data: searchResults, isLoading: isSearching } = useTmdbSearch(query);
+  const submitSuggestion = useSubmitSuggestion();
+  const { data: approved, isLoading: isLoadingApproved } = useApprovedSuggestions();
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const scroll = (dir: "left" | "right") => {
+    if (scrollRef.current) scrollRef.current.scrollBy({ left: dir === "right" ? 320 : -320, behavior: "smooth" });
+  };
+
+  const handleSelect = (item: any) => {
+    setPendingItem(item);
+    setQuery("");
+    setSubmitted(false);
+  };
+
+  const handleSubmit = () => {
+    if (!pendingItem) return;
+    submitSuggestion.mutate(
+      {
+        tmdb_id: pendingItem.id,
+        media_type: pendingItem.media_type,
+        title: pendingItem.title || pendingItem.name,
+        original_title: pendingItem.original_title || pendingItem.original_name || null,
+        poster_path: pendingItem.poster_path || null,
+        release_date: pendingItem.release_date || pendingItem.first_air_date || null,
+        suggested_by: suggesterName.trim() || null,
+      },
+      {
+        onSuccess: () => {
+          setSubmitted(true);
+          setPendingItem(null);
+          setSuggesterName("");
+        },
+      }
+    );
+  };
+
+  return (
+    <section className="py-6 px-4">
+      <div className="mb-4">
+        <h2 className="text-xs font-bold tracking-widest uppercase text-muted-foreground mb-1">
+          Recomendanos tu imperdible
+        </h2>
+        <p className="text-[11px] text-muted-foreground/60">
+          Buscá una peli o serie y mandanos tu recomendación
+        </p>
+      </div>
+
+      {submitted && (
+        <div className="bg-card border border-primary/30 rounded-xl p-4 flex items-center gap-3 mb-4">
+          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+            <Check size={14} className="text-primary" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-white">¡Gracias por la sugerencia!</p>
+            <p className="text-xs text-muted-foreground">La revisamos y si nos copa la subimos.</p>
+          </div>
+          <button onClick={() => setSubmitted(false)} className="text-muted-foreground hover:text-white">
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {!pendingItem ? (
+        <div className="relative mb-2">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Buscar película o serie..."
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            className="w-full bg-card border border-border rounded-xl pl-9 pr-9 py-2.5 text-sm focus:outline-none focus:border-primary text-white placeholder:text-muted-foreground"
+          />
+          {query && (
+            <button onClick={() => setQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white">
+              <X size={13} />
+            </button>
+          )}
+          {query.length >= 3 && (
+            <div className="absolute top-full mt-1.5 w-full z-50 bg-card border border-border rounded-xl overflow-hidden shadow-2xl">
+              {isSearching ? (
+                <p className="text-xs text-muted-foreground text-center p-4">Buscando...</p>
+              ) : searchResults && searchResults.length > 0 ? (
+                <div className="max-h-64 overflow-y-auto no-scrollbar divide-y divide-border/50">
+                  {searchResults.slice(0, 6).map((item: any) => (
+                    <button
+                      key={item.id}
+                      onClick={() => handleSelect(item)}
+                      className="w-full flex gap-3 items-center p-3 hover:bg-background transition-colors text-left"
+                    >
+                      <div
+                        className="w-8 h-11 bg-muted rounded flex-shrink-0 bg-cover bg-center"
+                        style={{ backgroundImage: item.poster_path ? `url(https://image.tmdb.org/t/p/w200${item.poster_path})` : "none" }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-white truncate">{item.title || item.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {(item.release_date || item.first_air_date || "").substring(0, 4)} · {item.media_type === "movie" ? "Película" : "Serie"}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground text-center p-4">Sin resultados</p>
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="bg-card border border-border rounded-xl p-4 mb-4 flex flex-col gap-3">
+          <div className="flex gap-3 items-center">
+            <div
+              className="w-10 h-14 rounded-lg bg-muted bg-cover bg-center flex-shrink-0"
+              style={{ backgroundImage: pendingItem.poster_path ? `url(https://image.tmdb.org/t/p/w200${pendingItem.poster_path})` : "none" }}
+            />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-white truncate">{pendingItem.title || pendingItem.name}</p>
+              <p className="text-xs text-muted-foreground">
+                {(pendingItem.release_date || pendingItem.first_air_date || "").substring(0, 4)} · {pendingItem.media_type === "movie" ? "Película" : "Serie"}
+              </p>
+            </div>
+            <button onClick={() => setPendingItem(null)} className="text-muted-foreground hover:text-white p-1 flex-shrink-0">
+              <X size={14} />
+            </button>
+          </div>
+          <input
+            type="text"
+            placeholder="Tu nombre o alias (opcional)"
+            value={suggesterName}
+            onChange={e => setSuggesterName(e.target.value)}
+            maxLength={40}
+            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary text-white placeholder:text-muted-foreground"
+          />
+          <button
+            onClick={handleSubmit}
+            disabled={submitSuggestion.isPending}
+            className="w-full bg-primary text-primary-foreground font-bold py-2.5 rounded-lg text-sm hover:opacity-90 disabled:opacity-50 transition-opacity"
+          >
+            {submitSuggestion.isPending ? "Enviando..." : "Enviar sugerencia"}
+          </button>
+        </div>
+      )}
+
+      {/* Sugerencias aprobadas */}
+      {!isLoadingApproved && approved && approved.length > 0 && (
+        <>
+          <div className="flex justify-between items-center mt-2 mb-3 pr-4">
+            <p className="text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-wider">
+              Las que ya subimos
+            </p>
+            <div className="flex gap-1">
+              <button onClick={() => scroll("left")} className="p-1 rounded-full border border-border text-muted-foreground hover:text-white hover:border-white transition-colors">
+                <ChevronLeft size={14} />
+              </button>
+              <button onClick={() => scroll("right")} className="p-1 rounded-full border border-border text-muted-foreground hover:text-white hover:border-white transition-colors">
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+          <div ref={scrollRef} className="flex gap-4 overflow-x-auto no-scrollbar pb-4 snap-x pr-4">
+            {approved.map((item: SuggestionRow) => (
+              <div key={item.id} className="min-w-[120px] w-[120px] flex flex-col gap-1 snap-start">
+                <div
+                  className="w-full aspect-[2/3] rounded-lg bg-cover bg-center shadow-md border border-border"
+                  style={{ backgroundImage: `url(${item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : ''})` }}
+                />
+                <div>
+                  <h3 className="font-bold text-xs text-white line-clamp-1">{item.title}</h3>
+                  {item.suggested_by && (
+                    <p className="text-[10px] text-muted-foreground/50 truncate">por {item.suggested_by}</p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+// ─── Content Section ──────────────────────────────────────────────────────────
 
 function ContentSection({
   title, items, isLoading, onSelect, showDate,

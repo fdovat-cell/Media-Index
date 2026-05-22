@@ -1,11 +1,11 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { PhoneLayout } from "@/components/layout/PhoneLayout";
 import { useContent, useNotes, useApprovedSuggestions, SuggestionRow } from "@/hooks/use-data";
 import { useTmdbSearch, useSubmitSuggestion } from "@/hooks/use-admin";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ContentRow, NoteRow } from "@/lib/database.types";
 import { DetailPopup } from "@/components/DetailPopup";
-import { Star, FileText, ChevronLeft, ChevronRight, Search, X, Check } from "lucide-react";
+import { Star, FileText, ChevronLeft, ChevronRight, Search, X, Check, Share2 } from "lucide-react";
 
 const WA_NUMBER = "59896190002";
 const WA_TEXT = encodeURIComponent("Hola, vengo de quevemoshoy...");
@@ -22,6 +22,17 @@ export default function Home() {
   const [platformFilter, setPlatformFilter] = useState<string | null>(null);
 
   const notesScrollRef = useRef<HTMLDivElement>(null);
+
+  // Actualiza la URL cuando se abre/cierra un popup para que el share incluya el contenido
+  useEffect(() => {
+    if (selectedItem) {
+      const title = "title" in selectedItem ? selectedItem.title : (selectedItem as NoteRow).title;
+      const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+      history.replaceState({}, "", `?v=${selectedItem.id}&t=${slug}`);
+    } else {
+      history.replaceState({}, "", window.location.pathname);
+    }
+  }, [selectedItem]);
 
   const allPlatforms = useMemo(() => {
     const platforms = new Set<string>();
@@ -223,6 +234,75 @@ export default function Home() {
   );
 }
 
+// ─── Suggestion Detail Popup ──────────────────────────────────────────────────
+
+function SuggestionDetailPopup({ item, onClose }: { item: SuggestionRow; onClose: () => void }) {
+  const year = (item.release_date || "").substring(0, 4);
+  const tipo = item.media_type === "movie" ? "Película" : "Serie";
+
+  const handleShare = async () => {
+    const url = window.location.href;
+    const text = `"${item.title}" — recomendado en Qué Vemos Hoy`;
+    if (navigator.share) {
+      await navigator.share({ title: item.title, text, url }).catch(() => {});
+    } else {
+      await navigator.clipboard.writeText(`${text}\n${url}`).catch(() => {});
+    }
+  };
+
+  useEffect(() => {
+    const slug = item.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    history.replaceState({}, "", `?v=${item.id}&t=${slug}`);
+    return () => { history.replaceState({}, "", window.location.pathname); };
+  }, [item]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+      <div
+        className="relative w-full max-w-sm bg-card rounded-t-2xl overflow-hidden shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Poster banner */}
+        {item.poster_path && (
+          <div
+            className="w-full h-48 bg-cover bg-center"
+            style={{ backgroundImage: `url(https://image.tmdb.org/t/p/w500${item.poster_path})` }}
+          >
+            <div className="absolute inset-0 h-48 bg-gradient-to-t from-card via-card/50 to-transparent" />
+          </div>
+        )}
+
+        <div className="p-5 flex flex-col gap-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-black text-white leading-tight">{item.title}</h2>
+              {item.original_title && item.original_title !== item.title && (
+                <p className="text-xs text-muted-foreground mt-0.5">{item.original_title}</p>
+              )}
+              <p className="text-xs text-primary mt-1 font-medium">{tipo}{year ? ` · ${year}` : ""}</p>
+            </div>
+            <button onClick={onClose} className="p-2 rounded-full text-muted-foreground hover:text-white flex-shrink-0">
+              <X size={18} />
+            </button>
+          </div>
+
+          {item.suggested_by && (
+            <p className="text-xs text-muted-foreground/60 italic">sugerido por {item.suggested_by}</p>
+          )}
+
+          <button
+            onClick={handleShare}
+            className="flex items-center justify-center gap-2 w-full border border-border text-muted-foreground hover:text-white hover:border-white rounded-xl py-2.5 text-sm transition-colors"
+          >
+            <Share2 size={14} /> Compartir
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Suggest Section ──────────────────────────────────────────────────────────
 
 function SuggestSection() {
@@ -230,6 +310,7 @@ function SuggestSection() {
   const [pendingItem, setPendingItem] = useState<any>(null);
   const [suggesterName, setSuggesterName] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [selectedSuggestion, setSelectedSuggestion] = useState<SuggestionRow | null>(null);
   const { data: searchResults, isLoading: isSearching } = useTmdbSearch(query);
   const submitSuggestion = useSubmitSuggestion();
   const { data: approved, isLoading: isLoadingApproved } = useApprovedSuggestions();
@@ -392,13 +473,17 @@ function SuggestSection() {
           </div>
           <div ref={scrollRef} className="flex gap-4 overflow-x-auto no-scrollbar pb-4 snap-x pr-4">
             {approved.map((item: SuggestionRow) => (
-              <div key={item.id} className="min-w-[120px] w-[120px] flex flex-col gap-1 snap-start">
+              <div
+                key={item.id}
+                className="min-w-[120px] w-[120px] flex flex-col gap-1 snap-start cursor-pointer group"
+                onClick={() => setSelectedSuggestion(item)}
+              >
                 <div
-                  className="w-full aspect-[2/3] rounded-lg bg-cover bg-center shadow-md border border-border"
+                  className="w-full aspect-[2/3] rounded-lg bg-cover bg-center shadow-md border border-border group-hover:border-primary/50 transition-colors"
                   style={{ backgroundImage: `url(${item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : ''})` }}
                 />
                 <div>
-                  <h3 className="font-bold text-xs text-white line-clamp-1">{item.title}</h3>
+                  <h3 className="font-bold text-xs text-white line-clamp-1 group-hover:text-primary transition-colors">{item.title}</h3>
                   {item.suggested_by && (
                     <p className="text-[10px] text-muted-foreground/50 truncate">por {item.suggested_by}</p>
                   )}
@@ -407,6 +492,10 @@ function SuggestSection() {
             ))}
           </div>
         </>
+      )}
+
+      {selectedSuggestion && (
+        <SuggestionDetailPopup item={selectedSuggestion} onClose={() => setSelectedSuggestion(null)} />
       )}
     </section>
   );

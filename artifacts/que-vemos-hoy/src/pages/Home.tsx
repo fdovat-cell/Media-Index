@@ -274,32 +274,34 @@ function SuggestionDetailPopup({ item, onClose }: { item: SuggestionRow; onClose
         className="relative w-full max-w-sm bg-card rounded-t-2xl overflow-hidden shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
-        {/* Poster con título encima */}
-        <div className="relative w-full h-64 overflow-hidden bg-muted">
-          {item.poster_path && (
-            <div
-              className="absolute inset-0 bg-cover bg-top"
-              style={{ backgroundImage: `url(https://image.tmdb.org/t/p/w500${item.poster_path})` }}
-            />
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-card via-card/60 to-transparent" />
-          <button
-            onClick={onClose}
-            className="absolute top-3 right-3 p-2 rounded-full bg-black/50 text-white hover:bg-black/70"
-          >
-            <X size={15} />
-          </button>
-          <div className="absolute bottom-0 left-0 right-0 px-4 pb-4">
-            <h2 className="text-xl font-black text-white leading-tight">{item.title}</h2>
+        {/* Botón cerrar */}
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 z-10 p-2 rounded-full bg-black/60 text-white"
+        >
+          <X size={15} />
+        </button>
+
+        {/* Imagen */}
+        {item.poster_path ? (
+          <img
+            src={`https://image.tmdb.org/t/p/w500${item.poster_path}`}
+            alt={item.title}
+            className="w-full h-56 object-cover object-top"
+          />
+        ) : (
+          <div className="w-full h-32 bg-muted" />
+        )}
+
+        {/* Info */}
+        <div className="p-4 flex flex-col gap-3">
+          <div>
+            <h2 className="text-lg font-black text-white leading-tight">{item.title}</h2>
             {item.original_title && item.original_title !== item.title && (
               <p className="text-xs text-muted-foreground mt-0.5">{item.original_title}</p>
             )}
             <p className="text-xs text-primary mt-1 font-semibold">{tipo}{year ? ` · ${year}` : ""}</p>
           </div>
-        </div>
-
-        {/* Acciones */}
-        <div className="p-4 flex flex-col gap-3">
           {item.suggested_by && (
             <p className="text-xs text-muted-foreground/60 italic">sugerido por {item.suggested_by}</p>
           )}

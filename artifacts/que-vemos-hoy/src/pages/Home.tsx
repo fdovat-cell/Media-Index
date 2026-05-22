@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";a
+import { useState, useMemo, useRef } from "react";
 import { PhoneLayout } from "@/components/layout/PhoneLayout";
 import { useContent, useNotes, useApprovedSuggestions, SuggestionRow } from "@/hooks/use-data";
 import { useTmdbSearch, useSubmitSuggestion } from "@/hooks/use-admin";

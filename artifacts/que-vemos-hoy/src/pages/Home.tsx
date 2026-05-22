@@ -274,35 +274,35 @@ function SuggestionDetailPopup({ item, onClose }: { item: SuggestionRow; onClose
         className="relative w-full max-w-sm bg-card rounded-t-2xl overflow-hidden shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
-        {/* Poster banner */}
-        {item.poster_path && (
-          <div className="relative w-full h-48 overflow-hidden">
+        {/* Poster con título encima */}
+        <div className="relative w-full h-64 overflow-hidden bg-muted">
+          {item.poster_path && (
             <div
               className="absolute inset-0 bg-cover bg-top"
               style={{ backgroundImage: `url(https://image.tmdb.org/t/p/w500${item.poster_path})` }}
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-card via-card/40 to-transparent" />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-card via-card/60 to-transparent" />
+          <button
+            onClick={onClose}
+            className="absolute top-3 right-3 p-2 rounded-full bg-black/50 text-white hover:bg-black/70"
+          >
+            <X size={15} />
+          </button>
+          <div className="absolute bottom-0 left-0 right-0 px-4 pb-4">
+            <h2 className="text-xl font-black text-white leading-tight">{item.title}</h2>
+            {item.original_title && item.original_title !== item.title && (
+              <p className="text-xs text-muted-foreground mt-0.5">{item.original_title}</p>
+            )}
+            <p className="text-xs text-primary mt-1 font-semibold">{tipo}{year ? ` · ${year}` : ""}</p>
           </div>
-        )}
+        </div>
 
-        <div className="p-5 flex flex-col gap-3">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-black text-white leading-tight">{item.title}</h2>
-              {item.original_title && item.original_title !== item.title && (
-                <p className="text-xs text-muted-foreground mt-0.5">{item.original_title}</p>
-              )}
-              <p className="text-xs text-primary mt-1 font-medium">{tipo}{year ? ` · ${year}` : ""}</p>
-            </div>
-            <button onClick={onClose} className="p-2 rounded-full text-muted-foreground hover:text-white flex-shrink-0">
-              <X size={18} />
-            </button>
-          </div>
-
+        {/* Acciones */}
+        <div className="p-4 flex flex-col gap-3">
           {item.suggested_by && (
             <p className="text-xs text-muted-foreground/60 italic">sugerido por {item.suggested_by}</p>
           )}
-
           <button
             onClick={handleShare}
             className="flex items-center justify-center gap-2 w-full border border-border text-muted-foreground hover:text-white hover:border-white rounded-xl py-2.5 text-sm transition-colors"

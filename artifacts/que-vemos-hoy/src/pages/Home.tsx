@@ -19,6 +19,7 @@ export default function Home() {
   const { data: notesContent, isLoading: isNotesLoading } = useNotes();
 
   const [selectedItem, setSelectedItem] = useState<ContentRow | NoteRow | null>(null);
+  const [selectedSuggestion, setSelectedSuggestion] = useState<SuggestionRow | null>(null);
   const [platformFilter, setPlatformFilter] = useState<string | null>(null);
   const [autoOpenId] = useState<string | null>(() => new URLSearchParams(window.location.search).get("v"));
 
@@ -220,7 +221,7 @@ export default function Home() {
         />
 
         {/* RECOMENDANOS TU IMPERDIBLE */}
-        <SuggestSection />
+        <SuggestSection onSelectSuggestion={setSelectedSuggestion} />
 
         {/* WHATSAPP BUTTON */}
         <div className="flex justify-center py-6">
@@ -239,6 +240,9 @@ export default function Home() {
 
         {selectedItem && (
           <DetailPopup item={selectedItem} onClose={() => setSelectedItem(null)} />
+        )}
+        {selectedSuggestion && (
+          <SuggestionDetailPopup item={selectedSuggestion} onClose={() => setSelectedSuggestion(null)} />
         )}
       </div>
     </PhoneLayout>
@@ -319,12 +323,11 @@ function SuggestionDetailPopup({ item, onClose }: { item: SuggestionRow; onClose
 
 // ─── Suggest Section ──────────────────────────────────────────────────────────
 
-function SuggestSection() {
+function SuggestSection({ onSelectSuggestion }: { onSelectSuggestion: (item: SuggestionRow) => void }) {
   const [query, setQuery] = useState("");
   const [pendingItem, setPendingItem] = useState<any>(null);
   const [suggesterName, setSuggesterName] = useState("");
   const [submitted, setSubmitted] = useState(false);
-  const [selectedSuggestion, setSelectedSuggestion] = useState<SuggestionRow | null>(null);
   const { data: searchResults, isLoading: isSearching } = useTmdbSearch(query);
   const submitSuggestion = useSubmitSuggestion();
   const { data: approved, isLoading: isLoadingApproved } = useApprovedSuggestions();
@@ -490,7 +493,7 @@ function SuggestSection() {
               <div
                 key={item.id}
                 className="min-w-[120px] w-[120px] flex flex-col gap-1 snap-start cursor-pointer group"
-                onClick={() => setSelectedSuggestion(item)}
+                onClick={() => onSelectSuggestion(item)}
               >
                 <div
                   className="w-full aspect-[2/3] rounded-lg bg-cover bg-center shadow-md border border-border group-hover:border-primary/50 transition-colors"
@@ -508,9 +511,6 @@ function SuggestSection() {
         </>
       )}
 
-      {selectedSuggestion && (
-        <SuggestionDetailPopup item={selectedSuggestion} onClose={() => setSelectedSuggestion(null)} />
-      )}
     </section>
   );
 }

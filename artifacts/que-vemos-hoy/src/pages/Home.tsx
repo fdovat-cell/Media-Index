@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef } from "react";a
 import { PhoneLayout } from "@/components/layout/PhoneLayout";
 import { useContent, useNotes, useApprovedSuggestions, SuggestionRow } from "@/hooks/use-data";
 import { useTmdbSearch, useSubmitSuggestion } from "@/hooks/use-admin";
@@ -285,7 +285,7 @@ function SuggestSection() {
           </div>
           <div className="flex-1">
             <p className="text-sm font-semibold text-white">¡Gracias por la sugerencia!</p>
-            <p className="text-xs text-muted-foreground">La revisamos y si nos copa la subimos.</p>
+            <p className="text-xs text-muted-foreground">En breve la compartiremos.</p>
           </div>
           <button onClick={() => setSubmitted(false)} className="text-muted-foreground hover:text-white">
             <X size={14} />

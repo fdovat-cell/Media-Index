@@ -20,13 +20,24 @@ export default function Home() {
 
   const [selectedItem, setSelectedItem] = useState<ContentRow | NoteRow | null>(null);
   const [platformFilter, setPlatformFilter] = useState<string | null>(null);
+  const [autoOpenId] = useState<string | null>(() => new URLSearchParams(window.location.search).get("v"));
 
   const notesScrollRef = useRef<HTMLDivElement>(null);
+
+  // Auto-abre el popup si la URL tiene ?v=<id> (para cuando alguien abre un link compartido)
+  useEffect(() => {
+    if (!autoOpenId || selectedItem) return;
+    const all = [...(heroContent || []), ...(weeklyContent || []), ...(classicContent || []), ...(upcomingContent || [])];
+    const found = all.find(c => c.id === autoOpenId);
+    if (found) { setSelectedItem(found); return; }
+    const note = (notesContent || []).find(n => n.id === autoOpenId);
+    if (note) setSelectedItem(note);
+  }, [autoOpenId, heroContent, weeklyContent, classicContent, upcomingContent, notesContent]);
 
   // Actualiza la URL cuando se abre/cierra un popup para que el share incluya el contenido
   useEffect(() => {
     if (selectedItem) {
-      const title = "title" in selectedItem ? selectedItem.title : (selectedItem as NoteRow).title;
+      const title = selectedItem.title;
       const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
       history.replaceState({}, "", `?v=${selectedItem.id}&t=${slug}`);
     } else {
@@ -265,11 +276,12 @@ function SuggestionDetailPopup({ item, onClose }: { item: SuggestionRow; onClose
       >
         {/* Poster banner */}
         {item.poster_path && (
-          <div
-            className="w-full h-48 bg-cover bg-center"
-            style={{ backgroundImage: `url(https://image.tmdb.org/t/p/w500${item.poster_path})` }}
-          >
-            <div className="absolute inset-0 h-48 bg-gradient-to-t from-card via-card/50 to-transparent" />
+          <div className="relative w-full h-48 overflow-hidden">
+            <div
+              className="absolute inset-0 bg-cover bg-top"
+              style={{ backgroundImage: `url(https://image.tmdb.org/t/p/w500${item.poster_path})` }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-card via-card/40 to-transparent" />
           </div>
         )}
 
